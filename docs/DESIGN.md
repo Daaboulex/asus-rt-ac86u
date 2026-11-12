@@ -50,6 +50,8 @@ in the package build; the tests in `tests/hardware` run against a router.
 - The services the image adds change nothing until configured: `pbr` and
   `sqm-scripts` ship switched off, held by
   `test_added_service_ships_switched_off`.
+- A transmit power set for a radio caps every chain in its firmware:
+  `test_configured_transmit_power_caps_every_chain`.
 
 ## Hardware facts (this unit, stock boot log and dumps, 2026-11-10)
 

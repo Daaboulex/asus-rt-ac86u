@@ -26,3 +26,6 @@ also sold as the RT-AC2900, and `asus-rescue`, the Linux tool that flashes it.
 - The image carries WireGuard, the cake shaper with `sqm-scripts`, `pbr`,
   `iperf3` and the USB-serial drivers `cp210x`, `ch341` and `cdc-acm`, since
   no kernel module can be installed from OpenWrt's feed afterwards.
+- `iw-full` replaces `iw`, so the radio firmware's power targets can be
+  read, and a hardware test checks that a configured transmit power caps
+  every chain.

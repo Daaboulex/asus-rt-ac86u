@@ -30,8 +30,9 @@ the line says so.
   counting the beamforming gain of three and four chains and the antenna
   gain under "Hardware facts" in [`DESIGN.md`](./DESIGN.md). On 2026-11-12
   the cap read back as 9 dBm on every chain of both radios through the
-  firmware's `txpwr_target_max`. No test in this repository checks the
-  cap yet.
+  firmware's `txpwr_target_max`. The image ships `iw-full` for that
+  reading, and `test_configured_transmit_power_caps_every_chain` fails
+  when any chain's target exceeds the configured transmit power.
 - A radar (DFS) channel cannot carry an access point. `brcmfmac` announces
   DFS offload but never reports the channel availability check starting or
   finishing, so hostapd waits for it and never starts the access point.

@@ -5,6 +5,19 @@ import pytest
 from conftest import RADIO_2G_SLOT, RADIO_5G_SLOT, phys, radio_section
 
 NVRAM = "/lib/firmware/brcm/brcmfmac4366c-pcie.asus,rt-ac86u.txt"
+GET_VAR_HEADER = [0x06, 0x01, 0, 0, 0x40, 0, 0, 0, 0x14, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+
+
+def firmware_variable(router, interface: str, name: str) -> list[int]:
+    request = GET_VAR_HEADER + list(name.encode()) + [0]
+    output = router.run(
+        f"iw dev {interface} vendor recv 0x001018 0x1 " + " ".join(f"0x{b:02x}" for b in request)
+    )
+    return [
+        int(byte, 16)
+        for line in output.splitlines()
+        for byte in line.removeprefix("vendor response:").split()
+    ]
 
 
 def mac_plus(base: str, offset: int) -> str:
@@ -66,6 +79,27 @@ def test_channel_survey_reports_busy_time(router):
         interface = ap.removeprefix("hostapd.")
         router.run(f"iw dev {interface} scan ap-force > /dev/null")
         assert "channel busy time" in router.run(f"iw dev {interface} survey dump"), interface
+
+
+def test_configured_transmit_power_caps_every_chain(router):
+    found = phys(router)
+    checked = []
+    for slot in (RADIO_2G_SLOT, RADIO_5G_SLOT):
+        section = radio_section(router, slot)
+        cap = router.run(f"uci -q get wireless.{section}.txpower; true").strip()
+        interfaces = router.run(
+            f"ls /sys/class/ieee80211/{found[slot]}/device/net 2>/dev/null; true"
+        ).split()
+        if not cap or not interfaces:
+            continue
+        target = firmware_variable(router, interfaces[0], "txpwr_target_max")
+        chains = target[10 : 10 + target[14]]
+        assert chains, f"{interfaces[0]}: no chain in {target}"
+        dbm = [chain / 4 for chain in chains]
+        assert max(dbm) <= int(cap), f"{interfaces[0]}: {dbm} dBm, cap {cap}"
+        checked.append(slot)
+    if not checked:
+        pytest.skip("no running radio has a transmit power set")
 
 
 @pytest.mark.disruptive
