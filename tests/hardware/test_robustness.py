@@ -47,7 +47,7 @@ def test_a_panic_reboots_and_leaves_a_record(router):
     old = router.boot_id()
     marker = f"hardware-test-panic {old}"
     router.ssh(
-        f"echo '{marker}' > /dev/kmsg; echo 1 > /proc/sys/kernel/sysrq; "
+        f"sync; echo '{marker}' > /dev/kmsg; echo 1 > /proc/sys/kernel/sysrq; "
         "(sleep 1; echo c > /proc/sysrq-trigger) > /dev/null 2>&1 &"
     )
     router.wait_for_new_boot(old, limit=240)
