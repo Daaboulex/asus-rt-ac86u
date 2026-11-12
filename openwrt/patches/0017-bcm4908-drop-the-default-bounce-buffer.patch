@@ -1,0 +1,13 @@
+diff --git a/target/linux/bcm4908/config-6.18 b/target/linux/bcm4908/config-6.18
+index e41f5e3..da84c3c 100644
+--- a/target/linux/bcm4908/config-6.18
++++ b/target/linux/bcm4908/config-6.18
+@@ -57,7 +57,7 @@ CONFIG_CC_HAVE_SHADOW_CALL_STACK=y
+ CONFIG_CC_HAVE_STACKPROTECTOR_SYSREG=y
+ CONFIG_CLK_BCM_63XX=y
+ CONFIG_CLONE_BACKWARDS=y
+-CONFIG_CMDLINE="earlycon=bcm63xx_uart,0xff800640 console=ttyS0,115200"
++CONFIG_CMDLINE="earlycon=bcm63xx_uart,0xff800640 console=ttyS0,115200 swiotlb=noforce"
+ CONFIG_CMDLINE_FROM_BOOTLOADER=y
+ CONFIG_COMMON_CLK=y
+ CONFIG_COMMON_CLK_IPROC=y

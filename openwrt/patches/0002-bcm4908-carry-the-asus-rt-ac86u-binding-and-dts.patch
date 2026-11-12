@@ -1,0 +1,205 @@
+diff --git a/target/linux/bcm4908/patches-6.18/090-dt-bindings-arm-bcmbca-add-ASUS-RT-AC86U.patch b/target/linux/bcm4908/patches-6.18/090-dt-bindings-arm-bcmbca-add-ASUS-RT-AC86U.patch
+new file mode 100644
+index 0000000..b9f5e35
+--- /dev/null
++++ b/target/linux/bcm4908/patches-6.18/090-dt-bindings-arm-bcmbca-add-ASUS-RT-AC86U.patch
+@@ -0,0 +1,16 @@
++From: Daaboulex <39669593+Daaboulex@users.noreply.github.com>
++Subject: [PATCH] dt-bindings: arm: bcmbca: add ASUS RT-AC86U
++
++The ASUS RT-AC86U, also sold as RT-AC2900, is a BCM4906 router.
++
++---
++--- a/Documentation/devicetree/bindings/arm/bcm/brcm,bcmbca.yaml
+++++ b/Documentation/devicetree/bindings/arm/bcm/brcm,bcmbca.yaml
++@@ -32,6 +32,7 @@
++       - description: BCM4906 based boards
++         items:
++           - enum:
+++              - asus,rt-ac86u
++               - netgear,r8000p
++               - tplink,archer-c2300-v1
++               - zyxel,ex3510b
+diff --git a/target/linux/bcm4908/patches-6.18/091-arm64-dts-broadcom-bcmbca-add-ASUS-RT-AC86U.patch b/target/linux/bcm4908/patches-6.18/091-arm64-dts-broadcom-bcmbca-add-ASUS-RT-AC86U.patch
+new file mode 100644
+index 0000000..8f169e4
+--- /dev/null
++++ b/target/linux/bcm4908/patches-6.18/091-arm64-dts-broadcom-bcmbca-add-ASUS-RT-AC86U.patch
+@@ -0,0 +1,177 @@
++From: Daaboulex <39669593+Daaboulex@users.noreply.github.com>
++Subject: [PATCH] arm64: dts: broadcom: bcmbca: add ASUS RT-AC86U
++
++BCM4906, 512 MiB RAM, 256 MiB NAND, four LAN and one WAN port on the
++internal switch, BCM43666 and BCM43664 radios on PCIe. The MAC address
++is read from the CFE area. Two firmware slots follow the vendor layout;
++the vendor misc and data areas are mapped read-only.
++
++---
++--- a/arch/arm64/boot/dts/broadcom/bcmbca/Makefile
+++++ b/arch/arm64/boot/dts/broadcom/bcmbca/Makefile
++@@ -1,5 +1,6 @@
++ # SPDX-License-Identifier: GPL-2.0
++ dtb-$(CONFIG_ARCH_BCMBCA) += \
+++				bcm4906-asus-rt-ac86u.dtb \
++ 				bcm4906-netgear-r8000p.dtb \
++ 				bcm4906-tplink-archer-c2300-v1.dtb \
++ 				bcm4906-zyxel-ex3510b.dtb \
++--- a/arch/arm64/boot/dts/broadcom/bcmbca/bcm4906-asus-rt-ac86u.dts
+++++ b/arch/arm64/boot/dts/broadcom/bcmbca/bcm4906-asus-rt-ac86u.dts
++@@ -0,0 +1,156 @@
+++// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
+++
+++#include <dt-bindings/gpio/gpio.h>
+++#include <dt-bindings/input/input.h>
+++#include <dt-bindings/leds/common.h>
+++
+++#include "bcm4906.dtsi"
+++
+++/ {
+++	compatible = "asus,rt-ac86u", "brcm,bcm4906", "brcm,bcm4908", "brcm,bcmbca";
+++	model = "Asus RT-AC86U";
+++
+++	memory@0 {
+++		device_type = "memory";
+++		reg = <0x00 0x00 0x00 0x20000000>;
+++	};
+++
+++	gpio-keys-polled {
+++		compatible = "gpio-keys-polled";
+++		poll-interval = <100>;
+++
+++		key-brightness {
+++			label = "LEDs";
+++			linux,code = <KEY_BRIGHTNESS_ZERO>;
+++			gpios = <&gpio0 14 GPIO_ACTIVE_LOW>;
+++		};
+++
+++		key-wifi {
+++			label = "WiFi";
+++			linux,code = <KEY_RFKILL>;
+++			gpios = <&gpio0 15 GPIO_ACTIVE_LOW>;
+++		};
+++
+++		key-wps {
+++			label = "WPS";
+++			linux,code = <KEY_WPS_BUTTON>;
+++			gpios = <&gpio0 22 GPIO_ACTIVE_LOW>;
+++		};
+++
+++		key-restart {
+++			label = "Reset";
+++			linux,code = <KEY_RESTART>;
+++			gpios = <&gpio0 23 GPIO_ACTIVE_LOW>;
+++		};
+++	};
+++};
+++
+++&enet {
+++	nvmem-cells = <&base_mac_addr>;
+++	nvmem-cell-names = "mac-address";
+++};
+++
+++&ports {
+++	port@0 {
+++		label = "lan4";
+++	};
+++
+++	port@1 {
+++		label = "lan3";
+++	};
+++
+++	port@2 {
+++		label = "lan2";
+++	};
+++
+++	port@3 {
+++		label = "lan1";
+++	};
+++
+++	port@7 {
+++		reg = <7>;
+++		phy-mode = "internal";
+++		phy-handle = <&phy12>;
+++		label = "wan";
+++	};
+++};
+++
+++&leds {
+++	led@4 {
+++		reg = <0x4>;
+++		function = LED_FUNCTION_POWER;
+++		color = <LED_COLOR_ID_WHITE>;
+++		default-state = "on";
+++		active-low;
+++		pinctrl-names = "default";
+++		pinctrl-0 = <&pins_led_4_a>;
+++	};
+++};
+++
+++&nand_controller {
+++	status = "okay";
+++};
+++
+++&nandcs {
+++	nand-ecc-strength = <4>;
+++	nand-ecc-step-size = <512>;
+++	nand-on-flash-bbt;
+++
+++	#address-cells = <1>;
+++	#size-cells = <0>;
+++
+++	partitions {
+++		compatible = "brcm,bcm4908-partitions";
+++		#address-cells = <1>;
+++		#size-cells = <1>;
+++
+++		partition@0 {
+++			label = "cferom";
+++			reg = <0x0 0x100000>;
+++
+++			nvmem-layout {
+++				compatible = "fixed-layout";
+++				#address-cells = <1>;
+++				#size-cells = <1>;
+++
+++				base_mac_addr: mac@106a0 {
+++					reg = <0x106a0 0x6>;
+++				};
+++			};
+++		};
+++
+++		partition@100000 {
+++			compatible = "brcm,bcm4908-firmware";
+++			reg = <0x100000 0x5f00000>;
+++		};
+++
+++		partition@6000000 {
+++			compatible = "brcm,bcm4908-firmware";
+++			reg = <0x6000000 0x5f00000>;
+++		};
+++
+++		partition@bf00000 {
+++			label = "misc1";
+++			reg = <0xbf00000 0x800000>;
+++			read-only;
+++		};
+++
+++		partition@c700000 {
+++			label = "misc2";
+++			reg = <0xc700000 0x2f00000>;
+++			read-only;
+++		};
+++
+++		partition@f600000 {
+++			label = "misc3";
+++			reg = <0xf600000 0x100000>;
+++			read-only;
+++		};
+++
+++		partition@f700000 {
+++			label = "data";
+++			reg = <0xf700000 0x800000>;
+++			read-only;
+++		};
+++	};
+++};

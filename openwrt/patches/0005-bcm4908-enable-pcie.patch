@@ -1,0 +1,261 @@
+diff --git a/target/linux/bcm4908/Makefile b/target/linux/bcm4908/Makefile
+index 52a9561..f8aeb82 100644
+--- a/target/linux/bcm4908/Makefile
++++ b/target/linux/bcm4908/Makefile
+@@ -5,7 +5,7 @@ include $(TOPDIR)/rules.mk
+ ARCH:=aarch64
+ BOARD:=bcm4908
+ BOARDNAME:=Broadcom BCM4908 (ARMv8A CPUs Brahma-B53)
+-FEATURES:=squashfs nand usb gpio
++FEATURES:=squashfs nand pci usb gpio
+ CPU_TYPE:=cortex-a53
+ SUBTARGETS:=generic
+ 
+diff --git a/target/linux/bcm4908/config-6.18 b/target/linux/bcm4908/config-6.18
+index e6179ae..4d469f6 100644
+--- a/target/linux/bcm4908/config-6.18
++++ b/target/linux/bcm4908/config-6.18
+@@ -35,6 +35,7 @@ CONFIG_ARM_ARCH_TIMER=y
+ CONFIG_ARM_ARCH_TIMER_EVTSTREAM=y
+ CONFIG_ARM_GIC=y
+ CONFIG_ARM_GIC_ITS_PARENT=y
++CONFIG_ARM_GIC_V2M=y
+ CONFIG_ARM_GIC_V3=y
+ CONFIG_ARM_GIC_V3_ITS=y
+ CONFIG_ARM_GIC_V5=y
+@@ -137,6 +138,7 @@ CONFIG_HARDIRQS_SW_RESEND=y
+ CONFIG_HAS_DMA=y
+ CONFIG_HAS_IOMEM=y
+ CONFIG_HAS_IOPORT=y
++CONFIG_HAS_IOPORT_MAP=y
+ CONFIG_HZ_PERIODIC=y
+ CONFIG_I2C=y
+ CONFIG_I2C_BOARDINFO=y
+@@ -197,7 +199,6 @@ CONFIG_NET_FLOW_LIMIT=y
+ CONFIG_NET_INGRESS=y
+ CONFIG_NET_SELFTESTS=y
+ CONFIG_NET_XGRESS=y
+-CONFIG_NO_IOPORT_MAP=y
+ CONFIG_NR_CPUS=4
+ CONFIG_NVMEM=y
+ CONFIG_NVMEM_LAYOUTS=y
+@@ -216,6 +217,11 @@ CONFIG_PAGE_POOL=y
+ CONFIG_PAGE_SIZE_LESS_THAN_256KB=y
+ CONFIG_PAGE_SIZE_LESS_THAN_64KB=y
+ CONFIG_PARTITION_PERCPU=y
++CONFIG_PCI=y
++CONFIG_PCIE_BRCMSTB=y
++CONFIG_PCI_DOMAINS=y
++CONFIG_PCI_DOMAINS_GENERIC=y
++CONFIG_PCI_MSI=y
+ CONFIG_PER_VMA_LOCK=y
+ CONFIG_PGTABLE_LEVELS=3
+ CONFIG_PHYLIB=y
+@@ -243,6 +249,8 @@ CONFIG_RATIONAL=y
+ CONFIG_REGMAP=y
+ CONFIG_REGMAP_MMIO=y
+ CONFIG_RELOCATABLE=y
++CONFIG_RESET_CONTROLLER=y
++CONFIG_RESET_SIMPLE=y
+ CONFIG_RFS_ACCEL=y
+ CONFIG_RPS=y
+ CONFIG_RWSEM_SPIN_ON_OWNER=y
+diff --git a/target/linux/bcm4908/patches-6.18/092-arm64-dts-broadcom-bcm4908-add-PCIe-controllers.patch b/target/linux/bcm4908/patches-6.18/092-arm64-dts-broadcom-bcm4908-add-PCIe-controllers.patch
+new file mode 100644
+index 0000000..f1606bc
+--- /dev/null
++++ b/target/linux/bcm4908/patches-6.18/092-arm64-dts-broadcom-bcm4908-add-PCIe-controllers.patch
+@@ -0,0 +1,67 @@
++From: Daaboulex <39669593+Daaboulex@users.noreply.github.com>
++Subject: [PATCH] arm64: dts: broadcom: bcm4908: add PCIe controllers
++
++BCM4908 has PCIe controllers at 0x80040000 and 0x80050000, each with
++its PMB power domain and a PERST line in the misc reset controller.
++Outbound windows sit at 0xc0000000 and 0xd0000000. Boards enable the
++ones they wire.
++
++---
++--- a/arch/arm64/boot/dts/broadcom/bcmbca/bcm4908.dtsi
+++++ b/arch/arm64/boot/dts/broadcom/bcmbca/bcm4908.dtsi
++@@ -323,6 +323,46 @@
++ 		};
++ 	};
++ 
+++	pcie0: pcie@80040000 {
+++		compatible = "brcm,bcm4908-pcie";
+++		reg = <0x00 0x80040000 0x00 0xa000>;
+++		device_type = "pci";
+++		#address-cells = <3>;
+++		#size-cells = <2>;
+++		#interrupt-cells = <1>;
+++		interrupts = <GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>;
+++		interrupt-names = "pcie";
+++		interrupt-map-mask = <0 0 0 7>;
+++		interrupt-map = <0 0 0 1 &gic GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>;
+++		ranges = <0x02000000 0x00 0xc0000000 0x00 0xc0000000 0x00 0x10000000>;
+++		power-domains = <&pmb BCM_PMB_PCIE0>;
+++		resets = <&pcie_reset 0>;
+++		reset-names = "perst";
+++		linux,pci-domain = <0>;
+++		bus-range = <0x00 0xff>;
+++		status = "disabled";
+++	};
+++
+++	pcie1: pcie@80050000 {
+++		compatible = "brcm,bcm4908-pcie";
+++		reg = <0x00 0x80050000 0x00 0xa000>;
+++		device_type = "pci";
+++		#address-cells = <3>;
+++		#size-cells = <2>;
+++		#interrupt-cells = <1>;
+++		interrupts = <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>;
+++		interrupt-names = "pcie";
+++		interrupt-map-mask = <0 0 0 7>;
+++		interrupt-map = <0 0 0 1 &gic GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>;
+++		ranges = <0x02000000 0x00 0xd0000000 0x00 0xd0000000 0x00 0x10000000>;
+++		power-domains = <&pmb BCM_PMB_PCIE1>;
+++		resets = <&pcie_reset 1>;
+++		reset-names = "perst";
+++		linux,pci-domain = <1>;
+++		bus-range = <0x00 0xff>;
+++		status = "disabled";
+++	};
+++
++ 	/* PERF Peripherals */
++ 	bus@ff800000 {
++ 		compatible = "simple-bus";
++@@ -727,7 +767,7 @@
++ 			#size-cells = <1>;
++ 			ranges = <0x00 0x2600 0xe4>;
++ 
++-			reset-controller@2644 {
+++			pcie_reset: reset-controller@2644 {
++ 				compatible = "brcm,bcm4908-misc-pcie-reset";
++ 				reg = <0x44 0x04>;
++ 				#reset-cells = <1>;
+diff --git a/target/linux/bcm4908/patches-6.18/093-PCI-brcmstb-map-BCM4908-inbound-windows-through-UBUS.patch b/target/linux/bcm4908/patches-6.18/093-PCI-brcmstb-map-BCM4908-inbound-windows-through-UBUS.patch
+new file mode 100644
+index 0000000..3528bac
+--- /dev/null
++++ b/target/linux/bcm4908/patches-6.18/093-PCI-brcmstb-map-BCM4908-inbound-windows-through-UBUS.patch
+@@ -0,0 +1,87 @@
++From: Daaboulex <39669593+Daaboulex@users.noreply.github.com>
++Subject: [PATCH] PCI: brcmstb: Map BCM4908 inbound windows through UBUS
++
++BCM4908 reaches system memory over UBUS like BCM7712: each inbound
++BAR needs its UBUS remap register, and BAR1 carries the memory view
++instead of being disabled. Without it a device on the bus sees its
++DMA writes go nowhere. Legacy INTx is also masked in CPU_INTR1 out
++of reset, so a post-setup hook unmasks INTA to INTD.
++
++---
++--- a/drivers/pci/controller/pcie-brcmstb.c
+++++ b/drivers/pci/controller/pcie-brcmstb.c
++@@ -148,6 +148,9 @@
++ 
++ #define PCIE_MSI_INTR2_BASE		0x4500
++ 
+++#define PCIE_CPU_INTR1_INTR_MASK_CLEAR	0x940c
+++#define  PCIE_CPU_INTR1_INTX_MASK	GENMASK(4, 1)
+++
++ /* Offsets from INTR2_CPU and MSI_INTR2 BASE offsets */
++ #define  MSI_INT_STATUS			0x0
++ #define  MSI_INT_CLR			0x8
++@@ -832,6 +835,20 @@
++ 	return 0;
++ }
++ 
+++static bool brcm_pcie_ubus_inbound(struct brcm_pcie *pcie)
+++{
+++	return pcie->cfg->soc_base == BCM7712 ||
+++	       pcie->cfg->soc_base == BCM4908;
+++}
+++
+++static int brcm_pcie_post_setup_bcm4908(struct brcm_pcie *pcie)
+++{
+++	writel(PCIE_CPU_INTR1_INTX_MASK,
+++	       pcie->base + PCIE_CPU_INTR1_INTR_MASK_CLEAR);
+++
+++	return 0;
+++}
+++
++ static int brcm_pcie_post_setup_bcm2712(struct brcm_pcie *pcie)
++ {
++ 	static const u16 data[] = { 0x50b9, 0xbda1, 0x0094, 0x97b4, 0x5030,
++@@ -899,7 +916,7 @@
++ 	 * security considerations, and is not implemented in our modern
++ 	 * SoCs.
++ 	 */
++-	if (pcie->cfg->soc_base != BCM7712)
+++	if (!brcm_pcie_ubus_inbound(pcie))
++ 		add_inbound_win(b++, &n, 0, 0, 0);
++ 
++ 	resource_list_for_each_entry(entry, &bridge->dma_ranges) {
++@@ -916,7 +933,7 @@
++ 		 * That being said, each BARs size must still be a power of
++ 		 * two.
++ 		 */
++-		if (pcie->cfg->soc_base == BCM7712)
+++		if (brcm_pcie_ubus_inbound(pcie))
++ 			add_inbound_win(b++, &n, size, cpu_start, pcie_start);
++ 
++ 		if (n > pcie->cfg->num_inbound_wins)
++@@ -933,7 +950,7 @@
++ 	 * that enables multiple memory controllers.  As such, it can return
++ 	 * now w/o doing special configuration.
++ 	 */
++-	if (pcie->cfg->soc_base == BCM7712)
+++	if (brcm_pcie_ubus_inbound(pcie))
++ 		return n;
++ 
++ 	ret = of_property_read_variable_u64_array(pcie->np, "brcm,scb-sizes", pcie->memc_size, 1,
++@@ -1056,7 +1073,7 @@
++ 		 * 7712:
++ 		 *     All of their BARs need to be set.
++ 		 */
++-		if (pcie->cfg->soc_base == BCM7712) {
+++		if (brcm_pcie_ubus_inbound(pcie)) {
++ 			/* BUS remap register settings */
++ 			reg_offset = brcm_ubus_reg_offset(i);
++ 			tmp = lower_32_bits(cpu_addr) & ~0xfff;
++@@ -1787,6 +1804,7 @@
++ 	.soc_base	= BCM4908,
++ 	.perst_set	= brcm_pcie_perst_set_4908,
++ 	.bridge_sw_init_set = brcm_pcie_bridge_sw_init_set_generic,
+++	.post_setup	= brcm_pcie_post_setup_bcm4908,
++ 	.num_inbound_wins = 3,
++ };
++ 
+diff --git a/target/linux/bcm4908/patches-6.18/094-arm64-dts-broadcom-bcmbca-rt-ac86u-enable-PCIe.patch b/target/linux/bcm4908/patches-6.18/094-arm64-dts-broadcom-bcmbca-rt-ac86u-enable-PCIe.patch
+new file mode 100644
+index 0000000..ff8e143
+--- /dev/null
++++ b/target/linux/bcm4908/patches-6.18/094-arm64-dts-broadcom-bcmbca-rt-ac86u-enable-PCIe.patch
+@@ -0,0 +1,27 @@
++From: Daaboulex <39669593+Daaboulex@users.noreply.github.com>
++Subject: [PATCH] arm64: dts: broadcom: bcmbca: rt-ac86u: enable PCIe
++
++The 2.4 GHz radio sits on PCIe0 and the 5 GHz radio on PCIe1. The
++vendor firmware runs both links with spread spectrum clocking. Each
++link sees all 512 MiB of RAM at PCI address 0, the view the vendor
++firmware programs.
++
++---
++--- a/arch/arm64/boot/dts/broadcom/bcmbca/bcm4906-asus-rt-ac86u.dts
+++++ b/arch/arm64/boot/dts/broadcom/bcmbca/bcm4906-asus-rt-ac86u.dts
++@@ -154,3 +154,15 @@
++ 		};
++ 	};
++ };
+++
+++&pcie0 {
+++	dma-ranges = <0x02000000 0x00 0x00000000 0x00 0x00000000 0x00 0x20000000>;
+++	brcm,enable-ssc;
+++	status = "okay";
+++};
+++
+++&pcie1 {
+++	dma-ranges = <0x02000000 0x00 0x00000000 0x00 0x00000000 0x00 0x20000000>;
+++	brcm,enable-ssc;
+++	status = "okay";
+++};

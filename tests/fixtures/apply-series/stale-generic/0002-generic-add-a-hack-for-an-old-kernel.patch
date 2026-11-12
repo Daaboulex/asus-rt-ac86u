@@ -1,0 +1,4 @@
+--- /dev/null
++++ b/target/linux/generic/hack-6.12/900-fixture.patch
+@@ -0,0 +1 @@
++a generic kernel patch would sit here

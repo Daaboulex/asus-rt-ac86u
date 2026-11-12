@@ -1,0 +1,4 @@
+--- /dev/null
++++ b/target/linux/board/patches-6.18/100-fixture.patch
+@@ -0,0 +1 @@
++a kernel patch would sit here

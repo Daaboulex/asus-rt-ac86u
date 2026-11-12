@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=77.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "asus-rescue"
+dynamic = ["version"]
+description = "Flash an image to an ASUS router in rescue mode over its LAN port"
+license = "MIT"
+requires-python = ">=3.12"
+authors = [{ name = "Daaboulex" }]
+dependencies = []
+
+[project.scripts]
+asus-rescue = "asus_rescue.cli:main"
+
+[tool.setuptools.dynamic]
+version = { attr = "asus_rescue.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM"]

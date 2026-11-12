@@ -1,0 +1,29 @@
+diff --git a/target/linux/bcm4908/base-files/etc/rc.button/brightness_zero b/target/linux/bcm4908/base-files/etc/rc.button/brightness_zero
+new file mode 100755
+index 0000000..17644d1
+--- /dev/null
++++ b/target/linux/bcm4908/base-files/etc/rc.button/brightness_zero
+@@ -0,0 +1,23 @@
++#!/bin/sh
++
++[ "${ACTION}" = "released" ] || exit 0
++
++dark=/var/run/leds-dark
++stamp=/var/run/leds-button
++now=$(cut -d. -f1 /proc/uptime)
++last=$(cat "$stamp" 2>/dev/null)
++[ -n "$last" ] && [ "$((now - last))" -lt 1 ] && exit 0
++echo "$now" > "$stamp"
++
++if [ -e "$dark" ]; then
++	rm -f "$dark"
++	/etc/init.d/led restart
++	. /etc/diag.sh
++	set_state "done"
++else
++	: > "$dark"
++	for led in /sys/class/leds/*; do
++		echo none > "$led/trigger"
++		echo 0 > "$led/brightness"
++	done
++fi

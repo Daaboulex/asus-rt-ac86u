@@ -1,0 +1,13 @@
+diff --git a/target/linux/bcm4908/config-6.18 b/target/linux/bcm4908/config-6.18
+index 016ed7a..2d29512 100644
+--- a/target/linux/bcm4908/config-6.18
++++ b/target/linux/bcm4908/config-6.18
+@@ -139,6 +139,8 @@ CONFIG_HAS_DMA=y
+ CONFIG_HAS_IOMEM=y
+ CONFIG_HAS_IOPORT=y
+ CONFIG_HAS_IOPORT_MAP=y
++CONFIG_HW_RANDOM=y
++CONFIG_HW_RANDOM_IPROC_RNG200=y
+ CONFIG_HZ_PERIODIC=y
+ CONFIG_I2C=y
+ CONFIG_I2C_BOARDINFO=y

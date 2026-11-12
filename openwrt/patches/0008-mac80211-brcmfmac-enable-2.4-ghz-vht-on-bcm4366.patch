@@ -1,0 +1,103 @@
+diff --git a/package/kernel/mac80211/patches/brcm/880-wifi-brcmfmac-enable-2.4-GHz-VHT-on-BCM4366-before-AP-bring-up.patch b/package/kernel/mac80211/patches/brcm/880-wifi-brcmfmac-enable-2.4-GHz-VHT-on-BCM4366-before-AP-bring-up.patch
+new file mode 100644
+index 0000000..855e743
+--- /dev/null
++++ b/package/kernel/mac80211/patches/brcm/880-wifi-brcmfmac-enable-2.4-GHz-VHT-on-BCM4366-before-AP-bring-up.patch
+@@ -0,0 +1,97 @@
++From: Jeff Campbell <inca.jeff.campbell@gmail.com>
++Subject: [PATCH wireless-next] wifi: brcmfmac: enable 2.4 GHz VHT on BCM4366 before AP bring-up
++Date: Wed,  4 Nov 2026 17:04:26 +0000
++
++On BCM4366 firmware 10.28.2 (r769115) the 2.4 GHz radio defaults to
++vht_features 6: proprietary rates and 1024-QAM on, 2.4 GHz VHT off.
++brcmfmac never sets this iovar. As an AP the d11 PSM watchdog then fires
++repeatedly once a client passes traffic, the client disassociates and
++never completes DHCP.  This renders the radio unusable as an AP.
++
++On an ASUS RT-AC86U (BCM43666 2.4 GHz radio), with every other bring-up
++setting held fixed, values 0 and 6 fail and values 1 and 7 are stable,
++so bit 0 alone decides it. The ASUS firmware for this router sets 7.
++
++Set bit 0, keeping the other bits, on the primary 2.4 GHz BSS of the
++4366 family while the radio is still down. 5 GHz is left alone: it
++keeps 6 and is stable.  This stabilizes 2.4GHz AP and clients now
++associate, DHCP and pass traffic at normal levels.
++
++Signed-off-by: Jeff Campbell <inca.jeff.campbell@gmail.com>
++---
++Tested on an ASUS RT-AC86U, firmware 10.28.2 (r769115), AP mode, 2.4 GHz
++channel 1 at 20 MHz, one client. The router runs OpenWrt on 6.12, so this
++is wireless-next brcmfmac at 991a73f49 built as a module with a small
++local shim for the older cfg80211 API (not part of this patch), not a
++wireless-next kernel. The two builds differ only by this patch:
++
++  with patch:    vht_features 7, three speed test runs on one association,
++                 no watchdog, DHCP completes, 560/155917 tx failed
++  without patch: vht_features 6, 16 PSM watchdogs in the first 102 s after
++                 boot, client retries DHCP and gives up
++
++5 GHz stays at 6 in both builds. One speed test run there was clean, with
++no tx failures and no watchdog.
++
++The chip check covers the 4366
++family, but only the 43666 2.4 GHz radio on this board has been tested.
++
++ .../broadcom/brcm80211/brcmfmac/cfg80211.c    | 32 +++++++++++++++++++
++ 1 file changed, 32 insertions(+)
++
++diff --git a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.c b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.c
++index 46714d871..e971057fb 100644
++--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.c
+++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.c
++@@ -5253,6 +5253,36 @@ brcmf_parse_configure_security(struct brcmf_if *ifp,
++ 	return err;
++ }
++ 
+++#define BRCMF_VHT_FEATURES_2G_ENAB	BIT(0)
+++
+++static void brcmf_cfg80211_4366_2g_vht(struct brcmf_if *ifp,
+++				       const struct cfg80211_chan_def *chandef)
+++{
+++	u32 chip = ifp->drvr->bus_if->chip;
+++	u32 val, want;
+++	s32 err;
+++
+++	if (chandef->chan->band != NL80211_BAND_2GHZ)
+++		return;
+++	if (chip != BRCM_CC_4366_CHIP_ID && chip != BRCM_CC_43664_CHIP_ID &&
+++	    chip != BRCM_CC_43666_CHIP_ID)
+++		return;
+++	err = brcmf_fil_iovar_int_get(ifp, "vht_features", &val);
+++	if (err < 0) {
+++		brcmf_dbg(INFO, "vht_features get failed (%d)\n", err);
+++		return;
+++	}
+++	if (val & BRCMF_VHT_FEATURES_2G_ENAB)
+++		return;
+++	want = val | BRCMF_VHT_FEATURES_2G_ENAB;
+++	err = brcmf_fil_iovar_int_set(ifp, "vht_features", want);
+++	if (err < 0)
+++		bphy_err(ifp->drvr, "vht_features 2.4 GHz enable failed (%d)\n",
+++			 err);
+++	else
+++		brcmf_dbg(INFO, "vht_features 0x%x -> 0x%x\n", val, want);
+++}
+++
++ static s32
++ brcmf_cfg80211_start_ap(struct wiphy *wiphy, struct net_device *ndev,
++ 			struct cfg80211_ap_settings *settings)
++@@ -5397,6 +5427,8 @@ brcmf_cfg80211_start_ap(struct wiphy *wiphy, struct net_device *ndev,
++ 				goto exit;
++ 			}
++ 		}
+++		if (!mbss)
+++			brcmf_cfg80211_4366_2g_vht(ifp, &settings->chandef);
++ 		err = brcmf_fil_cmd_int_set(ifp, BRCMF_C_UP, 1);
++ 		if (err < 0) {
++ 			bphy_err(drvr, "BRCMF_C_UP error (%d)\n", err);
++
++base-commit: 991a73f4909f1348ffb4b38765cdb522a775e4c2
++-- 
++2.47.3
++
++

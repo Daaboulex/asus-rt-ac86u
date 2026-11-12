@@ -1,0 +1,74 @@
+diff --git a/target/linux/bcm4908/config-6.18 b/target/linux/bcm4908/config-6.18
+index 2d29512..d4eae29 100644
+--- a/target/linux/bcm4908/config-6.18
++++ b/target/linux/bcm4908/config-6.18
+@@ -86,6 +86,7 @@ CONFIG_DEBUG_INFO=y
+ CONFIG_DMA_BOUNCE_UNALIGNED_KMALLOC=y
+ CONFIG_DMA_DIRECT_REMAP=y
+ CONFIG_DMA_NEED_SYNC=y
++CONFIG_DMA_RESTRICTED_POOL=y
+ CONFIG_DTC=y
+ CONFIG_EDAC_SUPPORT=y
+ CONFIG_EXCLUSIVE_SYSTEM_RAM=y
+diff --git a/target/linux/bcm4908/patches-6.18/097-arm64-dts-broadcom-bcmbca-rt-ac86u-fence-the-radios-DMA.patch b/target/linux/bcm4908/patches-6.18/097-arm64-dts-broadcom-bcmbca-rt-ac86u-fence-the-radios-DMA.patch
+new file mode 100644
+index 0000000..8b68dc2
+--- /dev/null
++++ b/target/linux/bcm4908/patches-6.18/097-arm64-dts-broadcom-bcmbca-rt-ac86u-fence-the-radios-DMA.patch
+@@ -0,0 +1,56 @@
++From: Daaboulex <39669593+Daaboulex@users.noreply.github.com>
++Subject: [PATCH] arm64: dts: broadcom: bcmbca: rt-ac86u: fence the radios DMA
++
++The radios run closed firmware with bus mastering on PCIe, and the
++BCM4908 has no IOMMU, so each could read and write all of RAM through
++its inbound window. Give each link its own 32 MiB restricted DMA pool
++at the top of RAM and shrink its inbound window to exactly that pool:
++the kernel bounces every radio buffer through it, and neither radio
++reaches the rest of memory or the other radio's buffers.
++
++Each window maps its pool at the pool's own address. A pool seen at
++PCI address 0 hands its first buffer out at bus address 0, and the
++radio given that buffer never answered its first command. At the top
++of RAM the DMA zone still spans all memory, so the kernel keeps no
++bounce buffer of its own for the other devices.
++
++---
++--- a/arch/arm64/boot/dts/broadcom/bcmbca/bcm4906-asus-rt-ac86u.dts
+++++ b/arch/arm64/boot/dts/broadcom/bcmbca/bcm4906-asus-rt-ac86u.dts
++@@ -22,6 +22,18 @@
++ 		reg = <0x00 0x00 0x00 0x20000000>;
++ 	};
++ 
+++	reserved-memory {
+++		radio0_dma: wifi@1c000000 {
+++			compatible = "restricted-dma-pool";
+++			reg = <0x00 0x1c000000 0x00 0x2000000>;
+++		};
+++
+++		radio1_dma: wifi@1e000000 {
+++			compatible = "restricted-dma-pool";
+++			reg = <0x00 0x1e000000 0x00 0x2000000>;
+++		};
+++	};
+++
++ 	gpio-keys-polled {
++ 		compatible = "gpio-keys-polled";
++ 		poll-interval = <20>;
++@@ -239,13 +251,15 @@
++ };
++ 
++ &pcie0 {
++-	dma-ranges = <0x02000000 0x00 0x00000000 0x00 0x00000000 0x00 0x20000000>;
+++	memory-region = <&radio0_dma>;
+++	dma-ranges = <0x02000000 0x00 0x1c000000 0x00 0x1c000000 0x00 0x2000000>;
++ 	brcm,enable-ssc;
++ 	status = "okay";
++ };
++ 
++ &pcie1 {
++-	dma-ranges = <0x02000000 0x00 0x00000000 0x00 0x00000000 0x00 0x20000000>;
+++	memory-region = <&radio1_dma>;
+++	dma-ranges = <0x02000000 0x00 0x1e000000 0x00 0x1e000000 0x00 0x2000000>;
++ 	brcm,enable-ssc;
++ 	status = "okay";
++ };

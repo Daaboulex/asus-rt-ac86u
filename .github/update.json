@@ -1,0 +1,31 @@
+{
+  "package": "asus-rescue",
+  "upstream": {
+    "type": "none",
+    "owner": "Daaboulex",
+    "repo": "asus-rt-ac86u"
+  },
+  "packageFile": "flake.nix",
+  "hashes": [],
+  "verify": {
+    "binary": "asus-rescue",
+    "args": "--version",
+    "check": "wrapper"
+  },
+  "description": "OpenWrt port and Linux rescue-mode flasher for the ASUS RT-AC86U and RT-AC2900",
+  "topics": [
+    "nix",
+    "nixos",
+    "flake",
+    "openwrt",
+    "asus",
+    "rt-ac86u",
+    "rt-ac2900",
+    "router",
+    "firmware",
+    "bcm4908",
+    "python"
+  ],
+  "versionFile": "src/asus_rescue/__init__.py",
+  "versionAttr": "__version__"
+}

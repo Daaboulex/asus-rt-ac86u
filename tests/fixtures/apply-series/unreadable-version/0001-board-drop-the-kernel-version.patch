@@ -1,0 +1,6 @@
+--- a/target/linux/board/Makefile
++++ b/target/linux/board/Makefile
+@@ -1,2 +1,2 @@
+ BOARD:=board
+-KERNEL_PATCHVER:=6.18
++KERNEL_PATCHVER:=$(LATEST)

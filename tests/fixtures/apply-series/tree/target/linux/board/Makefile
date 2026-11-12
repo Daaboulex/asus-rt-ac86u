@@ -1,0 +1,2 @@
+BOARD:=board
+KERNEL_PATCHVER:=6.18

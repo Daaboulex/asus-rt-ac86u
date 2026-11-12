@@ -1,0 +1,77 @@
+diff --git a/target/linux/bcm4908/base-files/etc/board.d/01_leds b/target/linux/bcm4908/base-files/etc/board.d/01_leds
+index 8079ead..56357da 100755
+--- a/target/linux/bcm4908/base-files/etc/board.d/01_leds
++++ b/target/linux/bcm4908/base-files/etc/board.d/01_leds
+@@ -13,7 +13,6 @@ asus,rt-ac86u)
+ 	ucidef_set_led_netdev "lan2" "LAN2" "white:lan-2" "lan2" "link tx rx"
+ 	ucidef_set_led_netdev "lan3" "LAN3" "white:lan-3" "lan3" "link tx rx"
+ 	ucidef_set_led_netdev "lan4" "LAN4" "white:lan-4" "lan4" "link tx rx"
+-	ucidef_set_led_netdev "wan" "WAN" "white:wan" "wan" "link tx rx"
+ 	;;
+ esac
+ 
+diff --git a/target/linux/bcm4908/base-files/etc/hotplug.d/iface/50-wan-leds b/target/linux/bcm4908/base-files/etc/hotplug.d/iface/50-wan-leds
+new file mode 100644
+index 0000000..8c058e4
+--- /dev/null
++++ b/target/linux/bcm4908/base-files/etc/hotplug.d/iface/50-wan-leds
+@@ -0,0 +1,23 @@
++[ "$INTERFACE" = wan ] || exit 0
++[ -e /var/run/leds-dark ] && exit 0
++
++red=/sys/class/leds/red:wan
++white=/sys/class/leds/white:wan
++[ -d "$red" ] && [ -d "$white" ] || exit 0
++
++status=$(ubus call network.interface.wan status 2>/dev/null)
++
++if [ "$(echo "$status" | jsonfilter -e '@.up')" = true ]; then
++	echo none > "$red/trigger"
++	echo 0 > "$red/brightness"
++	echo netdev > "$white/trigger"
++	echo "$status" | jsonfilter -e '@.device' > "$white/device_name"
++	echo 1 > "$white/link"
++	echo 1 > "$white/tx"
++	echo 1 > "$white/rx"
++else
++	echo none > "$white/trigger"
++	echo 0 > "$white/brightness"
++	echo none > "$red/trigger"
++	cat "$red/max_brightness" > "$red/brightness"
++fi
+diff --git a/target/linux/bcm4908/base-files/etc/rc.button/brightness_zero b/target/linux/bcm4908/base-files/etc/rc.button/brightness_zero
+index 17644d1..b335554 100755
+--- a/target/linux/bcm4908/base-files/etc/rc.button/brightness_zero
++++ b/target/linux/bcm4908/base-files/etc/rc.button/brightness_zero
+@@ -14,6 +14,7 @@ if [ -e "$dark" ]; then
+ 	/etc/init.d/led restart
+ 	. /etc/diag.sh
+ 	set_state "done"
++	(export INTERFACE=wan; . /etc/hotplug.d/iface/50-wan-leds)
+ else
+ 	: > "$dark"
+ 	for led in /sys/class/leds/*; do
+diff --git a/target/linux/bcm4908/patches-6.18/100-arm64-dts-broadcom-bcmbca-rt-ac86u-light-the-red-wan-led-at-boot.patch b/target/linux/bcm4908/patches-6.18/100-arm64-dts-broadcom-bcmbca-rt-ac86u-light-the-red-wan-led-at-boot.patch
+new file mode 100644
+index 0000000..6ce7aed
+--- /dev/null
++++ b/target/linux/bcm4908/patches-6.18/100-arm64-dts-broadcom-bcmbca-rt-ac86u-light-the-red-wan-led-at-boot.patch
+@@ -0,0 +1,18 @@
++From: Daaboulex <39669593+Daaboulex@users.noreply.github.com>
++Subject: [PATCH] arm64: dts: broadcom: bcmbca: rt-ac86u: light the red wan led at boot
++
++The vendor documents the red WAN LED as "no IP or no physical
++connection". Nothing is connected while the kernel boots, so the LED
++starts lit; userspace turns it off once the WAN interface is up.
++
++---
++--- a/arch/arm64/boot/dts/broadcom/bcmbca/bcm4906-asus-rt-ac86u.dts
+++++ b/arch/arm64/boot/dts/broadcom/bcmbca/bcm4906-asus-rt-ac86u.dts
++@@ -167,6 +167,7 @@
++ 		reg = <0x14>;
++ 		function = LED_FUNCTION_WAN;
++ 		color = <LED_COLOR_ID_RED>;
+++		default-state = "on";
++ 		active-low;
++ 		pinctrl-names = "default";
++ 		pinctrl-0 = <&pins_led_20_a>;

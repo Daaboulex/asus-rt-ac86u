@@ -1,0 +1,62 @@
+diff --git a/target/linux/bcm4908/patches-6.18/101-net-dsa-bcm_sf2-defer-the-probe-before-touching-the-switch.patch b/target/linux/bcm4908/patches-6.18/101-net-dsa-bcm_sf2-defer-the-probe-before-touching-the-switch.patch
+new file mode 100644
+index 0000000..fe83ef0
+--- /dev/null
++++ b/target/linux/bcm4908/patches-6.18/101-net-dsa-bcm_sf2-defer-the-probe-before-touching-the-switch.patch
+@@ -0,0 +1,56 @@
++From: Daaboulex <39669593+Daaboulex@users.noreply.github.com>
++Subject: [PATCH] net: dsa: bcm_sf2: defer the probe before touching the switch
++
++On the BCM4908 the switch probes before its conduit Ethernet, so the
++first probes reset the switch, power its PHYs, scan its MDIO bus and
++request its interrupts, and only then learn from dsa_register_switch()
++that the conduit is missing. Each deferred attempt repeats that work
++and leaves the switch reset and half configured for the next one.
++
++Look the conduits up first and return -EPROBE_DEFER before any
++register access, so the switch is reset and set up once, by the probe
++that will register it.
++
++---
++--- a/drivers/net/dsa/bcm_sf2.c
+++++ b/drivers/net/dsa/bcm_sf2.c
++@@ -1362,6 +1362,28 @@
++ };
++ MODULE_DEVICE_TABLE(of, bcm_sf2_of_match);
++ 
+++static int bcm_sf2_conduits_ready(struct device_node *ports)
+++{
+++	struct device_node *port, *ethernet;
+++	struct net_device *conduit;
+++
+++	for_each_available_child_of_node(ports, port) {
+++		ethernet = of_parse_phandle(port, "ethernet", 0);
+++		if (!ethernet)
+++			continue;
+++
+++		conduit = of_find_net_device_by_node(ethernet);
+++		of_node_put(ethernet);
+++		if (!conduit) {
+++			of_node_put(port);
+++			return -EPROBE_DEFER;
+++		}
+++		put_device(&conduit->dev);
+++	}
+++
+++	return 0;
+++}
+++
++ static int bcm_sf2_sw_probe(struct platform_device *pdev)
++ {
++ 	const char *reg_names[BCM_SF2_REGS_NUM] = BCM_SF2_REGS_NAME;
++@@ -1446,7 +1468,10 @@
++ 	ports = of_find_node_by_name(dn, "ports");
++ 	if (ports) {
++ 		bcm_sf2_identify_ports(priv, ports);
+++		ret = bcm_sf2_conduits_ready(ports);
++ 		of_node_put(ports);
+++		if (ret)
+++			return ret;
++ 	}
++ 
++ 	priv->irq0 = irq_of_parse_and_map(dn, 0);

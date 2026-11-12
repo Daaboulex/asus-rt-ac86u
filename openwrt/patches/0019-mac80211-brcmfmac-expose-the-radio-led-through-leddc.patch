@@ -1,0 +1,137 @@
+diff --git a/package/kernel/mac80211/patches/brcm/883-wifi-brcmfmac-expose-the-radio-led-through-leddc.patch b/package/kernel/mac80211/patches/brcm/883-wifi-brcmfmac-expose-the-radio-led-through-leddc.patch
+new file mode 100644
+index 0000000..eb90e53
+--- /dev/null
++++ b/package/kernel/mac80211/patches/brcm/883-wifi-brcmfmac-expose-the-radio-led-through-leddc.patch
+@@ -0,0 +1,131 @@
++From: Daaboulex <39669593+Daaboulex@users.noreply.github.com>
++Subject: [PATCH] wifi: brcmfmac: expose the radio LED through leddc
++
++On BCM4366 boards the front LED of each band hangs off a GPIO of the
++radio chip, and the firmware drives it by itself from its ledbh
++behaviour; Linux had no way to turn it off or show traffic on it.
++
++The firmware takes the LED duty cycle as the leddc iovar at runtime:
++the upper half is the on time, the lower half the off time. When the
++firmware answers leddc, register an LED class device per radio. On
++restores the duty cycle the firmware started with, the board's own,
++and off sets a zero on time. The device takes any trigger, so the
++netdev trigger on the radio's interface shows the band down, up and
++passing traffic.
++
++---
++--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.c
+++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.c
++@@ -10,6 +10,7 @@
++ #include <linux/module.h>
++ #include <linux/vmalloc.h>
++ #include <linux/ctype.h>
+++#include <linux/leds.h>
++ #include <net/cfg80211.h>
++ #include <net/netlink.h>
++ #include <uapi/linux/if_arp.h>
++@@ -8481,6 +8482,68 @@
++ #endif
++ }
++ 
+++#define BRCMF_LEDDC_FULL	0x00640000
+++#define BRCMF_LEDDC_DARK	0x00000064
+++
+++struct brcmf_led {
+++	struct led_classdev cdev;
+++	struct brcmf_if *ifp;
+++	u32 on;
+++	char name[32];
+++};
+++
+++static int brcmf_led_brightness_set(struct led_classdev *cdev,
+++				    enum led_brightness value)
+++{
+++	struct brcmf_led *led = container_of(cdev, struct brcmf_led, cdev);
+++
+++	return brcmf_fil_iovar_int_set(led->ifp, "leddc",
+++				       value ? led->on : BRCMF_LEDDC_DARK);
+++}
+++
+++static void brcmf_led_attach(struct brcmf_cfg80211_info *cfg,
+++			     struct brcmf_if *ifp)
+++{
+++	struct brcmf_led *led;
+++	u32 leddc = 0;
+++
+++	if (!IS_REACHABLE(CONFIG_LEDS_CLASS))
+++		return;
+++
+++	if (brcmf_fil_iovar_int_get(ifp, "leddc", &leddc))
+++		return;
+++
+++	led = kzalloc(sizeof(*led), GFP_KERNEL);
+++	if (!led)
+++		return;
+++
+++	led->ifp = ifp;
+++	led->on = leddc >> 16 ? leddc : BRCMF_LEDDC_FULL;
+++	snprintf(led->name, sizeof(led->name), "brcmfmac-%s",
+++		 wiphy_name(cfg->wiphy));
+++	led->cdev.name = led->name;
+++	led->cdev.max_brightness = 1;
+++	led->cdev.brightness = 1;
+++	led->cdev.brightness_set_blocking = brcmf_led_brightness_set;
+++
+++	if (led_classdev_register(wiphy_dev(cfg->wiphy), &led->cdev)) {
+++		kfree(led);
+++		return;
+++	}
+++
+++	cfg->led = led;
+++}
+++
+++static void brcmf_led_detach(struct brcmf_cfg80211_info *cfg)
+++{
+++	if (!cfg->led)
+++		return;
+++
+++	led_classdev_unregister(&cfg->led->cdev);
+++	kfree(cfg->led);
+++	cfg->led = NULL;
+++}
+++
++ struct brcmf_cfg80211_info *brcmf_cfg80211_attach(struct brcmf_pub *drvr,
++ 						  struct cfg80211_ops *ops,
++ 						  bool p2pdev_forced)
++@@ -8647,6 +8710,8 @@
++ #endif
++ 	}
++ 
+++	brcmf_led_attach(cfg, ifp);
+++
++ 	return cfg;
++ 
++ detach:
++@@ -8670,6 +8735,7 @@
++ 	if (!cfg)
++ 		return;
++ 
+++	brcmf_led_detach(cfg);
++ 	brcmf_pno_detach(cfg);
++ 	brcmf_btcoex_detach(cfg);
++ 	wiphy_unregister(cfg->wiphy);
++--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.h
+++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.h
++@@ -366,6 +366,8 @@
++  * @wowl: wowl related information.
++  * @pno: information of pno module.
++  */
+++struct brcmf_led;
+++
++ struct brcmf_cfg80211_info {
++ 	struct wiphy *wiphy;
++ 	struct brcmf_cfg80211_conf *conf;
++@@ -398,6 +400,7 @@
++ 	struct brcmf_cfg80211_wowl wowl;
++ 	struct brcmf_pno_info *pno;
++ 	u8 ac_priority[MAX_8021D_PRIO];
+++	struct brcmf_led *led;
++ };
++ 
++ /**

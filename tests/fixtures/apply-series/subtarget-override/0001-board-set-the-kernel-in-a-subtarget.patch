@@ -1,0 +1,4 @@
+--- /dev/null
++++ b/target/linux/board/sub/target.mk
+@@ -0,0 +1 @@
++KERNEL_PATCHVER:=6.12

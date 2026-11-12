@@ -1,0 +1,168 @@
+diff --git a/target/linux/bcm4908/base-files/etc/board.d/01_leds b/target/linux/bcm4908/base-files/etc/board.d/01_leds
+new file mode 100755
+index 0000000..8079ead
+--- /dev/null
++++ b/target/linux/bcm4908/base-files/etc/board.d/01_leds
+@@ -0,0 +1,22 @@
++# SPDX-License-Identifier: GPL-2.0 OR BSD-2-Clause
++
++. /lib/functions/leds.sh
++. /lib/functions/uci-defaults.sh
++
++board=$(board_name)
++
++board_config_update
++
++case "$board" in
++asus,rt-ac86u)
++	ucidef_set_led_netdev "lan1" "LAN1" "white:lan-1" "lan1" "link tx rx"
++	ucidef_set_led_netdev "lan2" "LAN2" "white:lan-2" "lan2" "link tx rx"
++	ucidef_set_led_netdev "lan3" "LAN3" "white:lan-3" "lan3" "link tx rx"
++	ucidef_set_led_netdev "lan4" "LAN4" "white:lan-4" "lan4" "link tx rx"
++	ucidef_set_led_netdev "wan" "WAN" "white:wan" "wan" "link tx rx"
++	;;
++esac
++
++board_config_flush
++
++exit 0
+diff --git a/target/linux/bcm4908/patches-6.18/095-arm64-dts-broadcom-bcmbca-rt-ac86u-add-USB-and-LEDs.patch b/target/linux/bcm4908/patches-6.18/095-arm64-dts-broadcom-bcmbca-rt-ac86u-add-USB-and-LEDs.patch
+new file mode 100644
+index 0000000..6dee32d
+--- /dev/null
++++ b/target/linux/bcm4908/patches-6.18/095-arm64-dts-broadcom-bcmbca-rt-ac86u-add-USB-and-LEDs.patch
+@@ -0,0 +1,134 @@
++From: Daaboulex <39669593+Daaboulex@users.noreply.github.com>
++Subject: [PATCH] arm64: dts: broadcom: bcmbca: rt-ac86u: add USB and LEDs
++
++One USB 2.0 and one USB 3.0 port, and the front LEDs on the SoC LED
++controller, all active low: each LAN jack, WAN white for link and red
++for no internet, and power, which also serves as the boot, failsafe,
++running and upgrade indicator. The board has no USB LEDs. The buttons
++are polled every 20 ms so a short tap is not missed.
++
++---
++--- a/arch/arm64/boot/dts/broadcom/bcmbca/bcm4906-asus-rt-ac86u.dts
+++++ b/arch/arm64/boot/dts/broadcom/bcmbca/bcm4906-asus-rt-ac86u.dts
++@@ -10,6 +10,13 @@
++ 	compatible = "asus,rt-ac86u", "brcm,bcm4906", "brcm,bcm4908", "brcm,bcmbca";
++ 	model = "Asus RT-AC86U";
++ 
+++	aliases {
+++		led-boot = &led_power;
+++		led-failsafe = &led_power;
+++		led-running = &led_power;
+++		led-upgrade = &led_power;
+++	};
+++
++ 	memory@0 {
++ 		device_type = "memory";
++ 		reg = <0x00 0x00 0x00 0x20000000>;
++@@ -17,7 +24,7 @@
++ 
++ 	gpio-keys-polled {
++ 		compatible = "gpio-keys-polled";
++-		poll-interval = <100>;
+++		poll-interval = <20>;
++ 
++ 		key-brightness {
++ 			label = "LEDs";
++@@ -50,6 +57,23 @@
++ 	nvmem-cell-names = "mac-address";
++ };
++ 
+++&usb_phy {
+++	brcm,ioc = <1>;
+++	status = "okay";
+++};
+++
+++&ehci {
+++	status = "okay";
+++};
+++
+++&ohci {
+++	status = "okay";
+++};
+++
+++&xhci {
+++	status = "okay";
+++};
+++
++ &ports {
++ 	port@0 {
++ 		label = "lan4";
++@@ -76,7 +100,7 @@
++ };
++ 
++ &leds {
++-	led@4 {
+++	led_power: led@4 {
++ 		reg = <0x4>;
++ 		function = LED_FUNCTION_POWER;
++ 		color = <LED_COLOR_ID_WHITE>;
++@@ -85,6 +109,65 @@
++ 		pinctrl-names = "default";
++ 		pinctrl-0 = <&pins_led_4_a>;
++ 	};
+++
+++
+++	led@10 {
+++		reg = <0x10>;
+++		function = LED_FUNCTION_LAN;
+++		function-enumerator = <4>;
+++		color = <LED_COLOR_ID_WHITE>;
+++		active-low;
+++		pinctrl-names = "default";
+++		pinctrl-0 = <&pins_led_16_a>;
+++	};
+++
+++	led@11 {
+++		reg = <0x11>;
+++		function = LED_FUNCTION_LAN;
+++		function-enumerator = <3>;
+++		color = <LED_COLOR_ID_WHITE>;
+++		active-low;
+++		pinctrl-names = "default";
+++		pinctrl-0 = <&pins_led_17_a>;
+++	};
+++
+++	led@12 {
+++		reg = <0x12>;
+++		function = LED_FUNCTION_LAN;
+++		function-enumerator = <2>;
+++		color = <LED_COLOR_ID_WHITE>;
+++		active-low;
+++		pinctrl-names = "default";
+++		pinctrl-0 = <&pins_led_18_a>;
+++	};
+++
+++	led@13 {
+++		reg = <0x13>;
+++		function = LED_FUNCTION_LAN;
+++		function-enumerator = <1>;
+++		color = <LED_COLOR_ID_WHITE>;
+++		active-low;
+++		pinctrl-names = "default";
+++		pinctrl-0 = <&pins_led_19_a>;
+++	};
+++
+++	led@14 {
+++		reg = <0x14>;
+++		function = LED_FUNCTION_WAN;
+++		color = <LED_COLOR_ID_RED>;
+++		active-low;
+++		pinctrl-names = "default";
+++		pinctrl-0 = <&pins_led_20_a>;
+++	};
+++
+++	led@15 {
+++		reg = <0x15>;
+++		function = LED_FUNCTION_WAN;
+++		color = <LED_COLOR_ID_WHITE>;
+++		active-low;
+++		pinctrl-names = "default";
+++		pinctrl-0 = <&pins_led_21_a>;
+++	};
++ };
++ 
++ &nand_controller {

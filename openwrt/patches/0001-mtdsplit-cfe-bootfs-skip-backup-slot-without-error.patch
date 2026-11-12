@@ -1,0 +1,13 @@
+diff --git a/target/linux/generic/files/drivers/mtd/mtdsplit/mtdsplit_cfe_bootfs.c b/target/linux/generic/files/drivers/mtd/mtdsplit/mtdsplit_cfe_bootfs.c
+index c9d68f1..9f06043 100644
+--- a/target/linux/generic/files/drivers/mtd/mtdsplit/mtdsplit_cfe_bootfs.c
++++ b/target/linux/generic/files/drivers/mtd/mtdsplit/mtdsplit_cfe_bootfs.c
+@@ -33,7 +33,7 @@ static int mtdsplit_cfe_bootfs_parse(struct mtd_info *mtd,
+ 
+ 	/* Don't parse backup partitions */
+ 	if (strcmp(mtd->name, "firmware"))
+-		return -EINVAL;
++		return 0;
+ 
+ 	/* Find the end of JFFS2 bootfs partition */
+ 	offset = 0;

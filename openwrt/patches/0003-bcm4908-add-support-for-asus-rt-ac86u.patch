@@ -1,0 +1,54 @@
+diff --git a/target/linux/bcm4908/base-files/lib/upgrade/platform.sh b/target/linux/bcm4908/base-files/lib/upgrade/platform.sh
+index 0974331..c69a6b8 100644
+--- a/target/linux/bcm4908/base-files/lib/upgrade/platform.sh
++++ b/target/linux/bcm4908/base-files/lib/upgrade/platform.sh
+@@ -34,6 +34,7 @@ platform_expected_image() {
+ 
+ 	case "$machine" in
+ 		asus,gt-ac5300)			echo "asus GT-AC5300";;
++		asus,rt-ac86u)			echo "asus RT-AC86U";;
+ 		netgear,r8000p)			echo "chk U12H359T00_NETGEAR";;
+ 		tplink,archer-c2300-v1)		echo "";;
+ 	esac
+diff --git a/target/linux/bcm4908/image/Makefile b/target/linux/bcm4908/image/Makefile
+index 678881f..2c93c88 100644
+--- a/target/linux/bcm4908/image/Makefile
++++ b/target/linux/bcm4908/image/Makefile
+@@ -87,6 +87,22 @@ define Device/asus_gt-ac5300
+ endef
+ TARGET_DEVICES += asus_gt-ac5300
+ 
++define Device/asus_rt-ac86u
++  DEVICE_VENDOR := ASUS
++  DEVICE_MODEL := RT-AC86U
++  DEVICE_ALT0_VENDOR := ASUS
++  DEVICE_ALT0_MODEL := RT-AC2900
++  DEVICE_DTS := broadcom/bcmbca/bcm4906-asus-rt-ac86u
++  IMAGES := bin
++  IMAGE_SIZE := 97280k
++  IMAGE/bin := append-ubi | bcm4908img | bcm4908asus | check-size
++  ASUS_PRODUCTID := RT-AC86U
++  ASUS_BUILD_NO := 386
++  ASUS_FW_REV := 3.0.0.4
++  ASUS_EXT_NO := 52334
++endef
++TARGET_DEVICES += asus_rt-ac86u
++
+ define Device/asus_gt-ax6000
+   DEVICE_VENDOR := ASUS
+   DEVICE_MODEL := GT-AX6000
+diff --git a/target/linux/bcm4908/image/asus_rt-ac86u/rom/etc/image_ident b/target/linux/bcm4908/image/asus_rt-ac86u/rom/etc/image_ident
+new file mode 100644
+index 0000000..30b5274
+--- /dev/null
++++ b/target/linux/bcm4908/image/asus_rt-ac86u/rom/etc/image_ident
+@@ -0,0 +1,2 @@
++@(#) $imageversion: HND3221458 $
++@(#) $imageversion: HND3221458 $
+diff --git a/target/linux/bcm4908/image/asus_rt-ac86u/rom/etc/image_version b/target/linux/bcm4908/image/asus_rt-ac86u/rom/etc/image_version
+new file mode 100644
+index 0000000..200a49d
+--- /dev/null
++++ b/target/linux/bcm4908/image/asus_rt-ac86u/rom/etc/image_version
+@@ -0,0 +1 @@
++HND3221458

@@ -1,0 +1,68 @@
+diff --git a/package/system/procd/patches/100-hotplug-abort-a-firmware-request-that-cannot-be-served.patch b/package/system/procd/patches/100-hotplug-abort-a-firmware-request-that-cannot-be-served.patch
+new file mode 100644
+index 0000000..4a242ae
+--- /dev/null
++++ b/package/system/procd/patches/100-hotplug-abort-a-firmware-request-that-cannot-be-served.patch
+@@ -0,0 +1,62 @@
++From: Daaboulex <39669593+Daaboulex@users.noreply.github.com>
++Subject: [PATCH] hotplug: abort a firmware request that cannot be served
++
++When the requested file is missing, cannot be opened, or a read or
++write fails, handle_firmware still finished the request by writing 0
++to loading, which the kernel takes as a successful load of what was
++sent: an empty or truncated firmware. Optional firmware then arrives
++as a 0 byte file instead of ENOENT, and brcmfmac hands a 0 byte CLM
++blob to the radio, which rejects it and fails bring-up. Write -1 to
++loading on any failure so the kernel aborts the request.
++
++---
++--- a/plug/hotplug.c
+++++ b/plug/hotplug.c
++@@ -246,6 +246,7 @@
++ 	struct stat s = { 0 };
++ 	char *path, loadpath[256], syspath[256];
++ 	int fw, src, load, len;
+++	bool loaded = true;
++ 	static char buf[4096];
++ 
++ 	P_DEBUG(2, "Firmware request for %s/%s\n", dir, file);
++@@ -262,6 +263,7 @@
++ 		ERROR("Could not find firmware %s: %m\n", path);
++ 		src = -1;
++ 		s.st_size = 0;
+++		loaded = false;
++ 		goto send_to_kernel;
++ 	}
++ 
++@@ -269,6 +271,7 @@
++ 	if (src < 0) {
++ 		ERROR("Failed to open %s: %m\n", path);
++ 		s.st_size = 0;
+++		loaded = false;
++ 		goto send_to_kernel;
++ 	}
++ 
++@@ -295,11 +298,14 @@
++ 	len = s.st_size;
++ 	while (len) {
++ 		len = read(src, buf, sizeof(buf));
+++		if (len < 0)
+++			loaded = false;
++ 		if (len <= 0)
++ 			break;
++ 
++ 		if (write(fw, buf, len) == -1) {
++ 			ERROR("failed to write firmware file %s/%s to %s: %m\n", dir, file, dev);
+++			loaded = false;
++ 			break;
++ 		}
++ 	}
++@@ -312,7 +318,7 @@
++ 	if (load < 0) {
++ 		ERROR("Failed to open %s: %m\n", loadpath);
++ 	} else {
++-		if (write(load, "0", 1) == -1)
+++		if (write(load, loaded ? "0" : "-1", loaded ? 1 : 2) == -1)
++ 			ERROR("failed to write to %s: %m\n", loadpath);
++ 		close(load);
++ 	}

@@ -1,0 +1,115 @@
+diff --git a/target/linux/bcm4908/patches-6.18/099-watchdog-bcm7038_wdt-arm-the-watchdog-when-the-kernel-panics.patch b/target/linux/bcm4908/patches-6.18/099-watchdog-bcm7038_wdt-arm-the-watchdog-when-the-kernel-panics.patch
+new file mode 100644
+index 0000000..719eb68
+--- /dev/null
++++ b/target/linux/bcm4908/patches-6.18/099-watchdog-bcm7038_wdt-arm-the-watchdog-when-the-kernel-panics.patch
+@@ -0,0 +1,109 @@
++From: Daaboulex <39669593+Daaboulex@users.noreply.github.com>
++Subject: [PATCH] watchdog: bcm7038_wdt: arm the watchdog when the kernel panics
++
++A panic ends in emergency_restart() only after the panic notifiers,
++the kmsg dump and the panic timeout have run. When one of those steps
++stalls, for example a record write to flash while another CPU holds
++the bus, the machine stays down until someone cuts its power.
++
++Arm the watchdog from a panic notifier, before the kmsg dump, for the
++panic timeout plus ten seconds, so a stalled panic still ends in a
++reset. A panic timeout of zero asks to wait forever and is honoured:
++the watchdog is left alone.
++
++Register the driver at subsys_initcall rather than with the other
++device drivers, so the notifier exists before they probe: a lockup in
++an early probe panics before a device_initcall watchdog would exist.
++The watchdog core already queues a device registered this early.
++
++---
++--- a/drivers/watchdog/bcm7038_wdt.c
+++++ b/drivers/watchdog/bcm7038_wdt.c
++@@ -9,6 +9,8 @@
++ #include <linux/io.h>
++ #include <linux/module.h>
++ #include <linux/of.h>
+++#include <linux/panic.h>
+++#include <linux/panic_notifier.h>
++ #include <linux/platform_device.h>
++ #include <linux/platform_data/bcm7038_wdt.h>
++ #include <linux/pm.h>
++@@ -25,12 +27,14 @@
++ #define WDT_MIN_TIMEOUT		1 /* seconds */
++ #define WDT_DEFAULT_TIMEOUT	30 /* seconds */
++ #define WDT_DEFAULT_RATE	27000000
+++#define WDT_PANIC_MARGIN	10 /* seconds */
++ 
++ struct bcm7038_watchdog {
++ 	void __iomem		*base;
++ 	struct watchdog_device	wdd;
++ 	u32			rate;
++ 	struct clk		*clk;
+++	struct notifier_block	panic_nb;
++ };
++ 
++ static bool nowayout = WATCHDOG_NOWAYOUT;
++@@ -113,6 +117,31 @@
++ 	return time_left / wdt->rate;
++ }
++ 
+++static int bcm7038_wdt_panic(struct notifier_block *nb, unsigned long action,
+++			     void *data)
+++{
+++	struct bcm7038_watchdog *wdt = container_of(nb, struct bcm7038_watchdog,
+++						    panic_nb);
+++	unsigned int timeout;
+++
+++	if (!panic_timeout)
+++		return NOTIFY_DONE;
+++
+++	timeout = abs(panic_timeout) + WDT_PANIC_MARGIN;
+++	wdt->wdd.timeout = min(timeout, wdt->wdd.max_timeout);
+++	bcm7038_wdt_stop(&wdt->wdd);
+++	bcm7038_wdt_start(&wdt->wdd);
+++
+++	return NOTIFY_DONE;
+++}
+++
+++static void bcm7038_wdt_panic_unregister(void *data)
+++{
+++	struct bcm7038_watchdog *wdt = data;
+++
+++	atomic_notifier_chain_unregister(&panic_notifier_list, &wdt->panic_nb);
+++}
+++
++ static const struct watchdog_info bcm7038_wdt_info = {
++ 	.identity	= "Broadcom BCM7038 Watchdog Timer",
++ 	.options	= WDIOF_SETTIMEOUT | WDIOF_KEEPALIVEPING |
++@@ -174,6 +203,12 @@
++ 	if (err)
++ 		return err;
++ 
+++	wdt->panic_nb.notifier_call = bcm7038_wdt_panic;
+++	atomic_notifier_chain_register(&panic_notifier_list, &wdt->panic_nb);
+++	err = devm_add_action_or_reset(dev, bcm7038_wdt_panic_unregister, wdt);
+++	if (err)
+++		return err;
+++
++ 	dev_info(dev, "Registered BCM7038 Watchdog\n");
++ 
++ 	return 0;
++@@ -224,7 +259,17 @@
++ 		.pm		= pm_sleep_ptr(&bcm7038_wdt_pm_ops),
++ 	}
++ };
++-module_platform_driver(bcm7038_wdt_driver);
+++static int __init bcm7038_wdt_init(void)
+++{
+++	return platform_driver_register(&bcm7038_wdt_driver);
+++}
+++subsys_initcall(bcm7038_wdt_init);
+++
+++static void __exit bcm7038_wdt_exit(void)
+++{
+++	platform_driver_unregister(&bcm7038_wdt_driver);
+++}
+++module_exit(bcm7038_wdt_exit);
++ 
++ module_param(nowayout, bool, 0);
++ MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default="

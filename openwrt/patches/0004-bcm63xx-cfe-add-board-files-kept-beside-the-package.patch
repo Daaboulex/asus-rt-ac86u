@@ -1,0 +1,16 @@
+diff --git a/package/kernel/bcm63xx-cfe/Makefile b/package/kernel/bcm63xx-cfe/Makefile
+index 0187dc8..cccf764 100644
+--- a/package/kernel/bcm63xx-cfe/Makefile
++++ b/package/kernel/bcm63xx-cfe/Makefile
+@@ -26,6 +26,11 @@ define Package/bcm63xx-cfe/description
+   CFE RAM binaries for bcm63xx.
+ endef
+ 
++define Build/Prepare
++	$(call Build/Prepare/Default)
++	$(if $(wildcard ./files),$(CP) ./files/. $(PKG_BUILD_DIR)/)
++endef
++
+ define Build/Compile
+ 	true
+ endef
