@@ -40,6 +40,14 @@ the line says so.
   fails the suite the day it passes.
 - Routing runs on the CPU: OpenWrt has no hardware NAT offload for this SoC.
   No test in this repository measures throughput.
+- USB 3 storage reads slowly: an NVMe enclosure linked at 5 Gbit/s under
+  `uas` read 37 to 42 MB/s with `dd`, direct or cached, while both cores
+  stayed nearly idle (2026-11-12). The cause is not known.
+- A change rolled back by `uci apply` is restored in RAM first and reaches
+  flash with the kernel's write-back, up to about 35 s later
+  (`dirty_expire_centisecs` 3000, `dirty_writeback_centisecs` 500). On
+  2026-11-12 a deliberate panic 31 s after a rollback brought the rejected
+  firewall rule back at the next boot.
 - The unit reports no temperatures: Linux has no thermal driver for the
   BCM4908. No test in this repository checks it.
 - A crash log cannot live in RAM, because the unit's RAM does not survive a
@@ -59,6 +67,30 @@ the line says so.
 - Rescue mode answers at 192.168.1.1 on a LAN port only, directly, through a
   switch, or over Wi-Fi bridged to it. It serves no web page.
   `asus-rescue probe` found it this way on the unit.
+
+## Measured on the unit
+
+Each figure names how it was taken, on 2026-11-12, with both radios capped
+at 9 dBm per chain.
+
+- Wi-Fi link to a phone, from `iw dev <ap> station dump`: 975 to
+  1083 Mbit/s on 5 GHz at 80 MHz with -44 to -49 dBm of signal, and 520 to
+  650 Mbit/s at -67 to -69 dBm through an outside wall; 192 Mbit/s on
+  2.4 GHz at 20 MHz close by, carrying about 100 Mbit/s of TCP. Close to
+  the router the internet line, not the Wi-Fi, set the speed.
+- Automatic channel selection works: with `channel` set to `auto` and
+  `channels` to `1 6 11`, hostapd's ACS read the firmware's busy time per
+  channel and picked the least busy, which matched eight scans of
+  `iw dev <ap> survey dump`. The survey carries no noise floor for
+  channels 12 and 13, which ACS then skips.
+- Upload lag behind a DSL modem: two parallel `curl` uploads from the
+  router saturating the line raised the ping to 1.1.1.1 from about 15 ms
+  to 5 s on average and 14 s at worst. Cake from `sqm-scripts` on `wan`,
+  shaping the upload at about 90 % of the measured line rate with
+  `linklayer ethernet` and `overhead 34`, held it at 15 to 16 ms, 28 ms at
+  worst, for about 12 % less upload throughput. A saturating download
+  raised the ping by about 13 ms unshaped, so the download is left
+  unshaped.
 
 ## The ways back in
 
