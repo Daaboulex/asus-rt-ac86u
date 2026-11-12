@@ -39,6 +39,15 @@ the line says so.
   [`DESIGN.md`](./DESIGN.md). The kernel keeps its panic records in flash, on
   the vendor partition `misc3`: `test_panic_records_go_to_misc3` and
   `test_a_panic_reboots_and_leaves_a_record`.
+- A kernel module cannot be added after flashing. OpenWrt's package feed
+  builds its modules against its own kernel build, and `apk` hides every one
+  of them on this image: on 2026-11-12 the image's kernel package was
+  `6.18.60~b63c2fab` and the feed's `6.18.60~868fdef7`, and
+  `apk add --simulate kmod-wireguard` answered "no such package", while
+  `iperf3`, which has no kernel module, installed. The image therefore
+  carries WireGuard, the cake shaper with `sqm-scripts`, `pbr`, `iperf3` and
+  the USB-serial drivers `cp210x`, `ch341` and `cdc-acm`, held by
+  `tests/hardware/test_modules.py`.
 - Rescue mode answers at 192.168.1.1 on a LAN port only, directly, through a
   switch, or over Wi-Fi bridged to it. It serves no web page.
   `asus-rescue probe` found it this way on the unit.

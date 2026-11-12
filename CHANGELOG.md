@@ -23,3 +23,6 @@ also sold as the RT-AC2900, and `asus-rescue`, the Linux tool that flashes it.
 - `hardware-test`, which checks a running router over SSH.
 - A Firmware workflow that builds the image on a GitHub runner, keeps it with
   its checksums as an artifact, and opens an issue when the build fails.
+- The image carries WireGuard, the cake shaper with `sqm-scripts`, `pbr`,
+  `iperf3` and the USB-serial drivers `cp210x`, `ch341` and `cdc-acm`, since
+  no kernel module can be installed from OpenWrt's feed afterwards.

@@ -47,6 +47,9 @@ in the package build; the tests in `tests/hardware` run against a router.
 - A patch upstream has merged leaves the series: `openwrt-series-applies`
   stops on it, and the `merged` case of `openwrt-apply-series-fixtures`
   holds that rule.
+- The services the image adds change nothing until configured: `pbr` and
+  `sqm-scripts` ship switched off, held by
+  `test_added_service_ships_switched_off`.
 
 ## Hardware facts (this unit, stock boot log and dumps, 2026-11-10)
 
@@ -156,3 +159,10 @@ only through the issue its report job opens.
 
 - The repository is public. The series stays shaped for upstream, so sending
   it upstream remains open.
+- The image carries the kernel modules a router behind another router is
+  expected to need, because none can be added after flashing: WireGuard for
+  a VPN, cake with `sqm-scripts` against bufferbloat, `pbr` to send chosen
+  devices through a tunnel, and the USB-serial drivers common Zigbee and
+  Thread dongles use. Building every module and publishing them as a signed
+  feed was left out: more build time and a signing key to keep, for modules
+  nobody has asked for yet.

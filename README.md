@@ -94,6 +94,9 @@ Three switches open the tests that need more than a look:
 - There is no hardware NAT offload; routing runs on the CPU.
 - The router reports no temperatures.
 - Rescue mode answers on a LAN port only, and serves no web page.
+- A kernel module cannot be installed from OpenWrt's package feed. The image
+  carries WireGuard, the cake shaper and three USB-serial drivers, switched
+  off until configured.
 
 The detail and the evidence for each are in
 [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md).
