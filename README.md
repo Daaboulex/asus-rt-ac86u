@@ -90,6 +90,7 @@ Three switches open the tests that need more than a look:
 - The radios run Broadcom's closed firmware; no open firmware exists for them.
 - The radios do not run on German or EU limits: their firmware runs
   Broadcom's worldwide locale and ignores the country set on the router.
+  A transmit power of 9 dBm on each radio keeps them within those limits.
 - A radar (DFS) channel cannot carry an access point.
 - There is no hardware NAT offload; routing runs on the CPU.
 - The router reports no temperatures.

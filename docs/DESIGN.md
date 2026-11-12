@@ -67,6 +67,22 @@ in the package build; the tests in `tests/hardware` run against a router.
   starting 3.2 MiB in, file `.kernel_nvram.setting`, NUL-separated
   `key=value`; radio keys carry `0:` and `1:` prefixes. Country E0, regrev
   962.
+- Transmit chains and beamforming, read from the radio firmware
+  (2026-11-12): 2.4 GHz transmits on three chains (`txchain` 0xb, NVRAM
+  `0:sw_txchain_mask=0xb`), 5 GHz on four (0xf), and both have
+  beamforming on (`txbf` 1).
+- Antenna gain, from FCC ID MSQ-RTACHN00, whose model letter of
+  2017-04-13 names the RT-AC86U and RT-AC2900 among identical models:
+  1.33 dBi at 2.4 GHz, 1.57 dBi at 5.2 GHz and 1.85 dBi at 5.8 GHz (RF
+  exposure report 1720225R-RF-US-Exp). The second-source antennas filed
+  in 2019 measure 1.25 to 1.29 dBi at 2.4 GHz and 1.58 to 1.60 dBi at
+  5 GHz.
+- Uncapped, the firmware targets 16.5 dBm per chain at 2.4 GHz and
+  14.5 dBm at 5 GHz (`txpwr_target_max`). A transmit power set through
+  nl80211, as `iw dev <ap> set txpower fixed` or LuCI does, caps every
+  chain's target at that value: caps of 14 and 10 dBm read back as 14
+  and 10 on each chain, and `auto` restores the uncapped targets
+  (2026-11-12).
 - MAC layout, as offsets from the base MAC at `cferom` 0x106a0 (checked
   against the label): LAN, WAN and 2.4 GHz base+0, 5 GHz base+4.
 - RAM does not survive a warm reset: a pattern written to the reserved

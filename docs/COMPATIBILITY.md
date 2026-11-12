@@ -23,8 +23,15 @@ the line says so.
   Broadcom's worldwide locale `XT` and ignores the country `E0` and revision
   `962` in the unit's NVRAM. `brcmfmac` passes a configured country to the
   firmware only through a `brcm,ccode-map`, which this board does not have,
-  and linux-firmware ships no CLM file for the 4366c. No test in this
-  repository checks the locale.
+  and linux-firmware ships no CLM file for the 4366c. A transmit power of
+  9 dBm on each radio (`uci set wireless.radio0.txpower=9`, the same for
+  `radio1`) keeps the radios within the German limits, which follow the
+  EU's: 19.9 dBm EIRP at 2.4 GHz and 22.6 dBm on channels 36 to 48,
+  counting the beamforming gain of three and four chains and the antenna
+  gain under "Hardware facts" in [`DESIGN.md`](./DESIGN.md). On 2026-11-12
+  the cap read back as 9 dBm on every chain of both radios through the
+  firmware's `txpwr_target_max`. No test in this repository checks the
+  cap yet.
 - A radar (DFS) channel cannot carry an access point. `brcmfmac` announces
   DFS offload but never reports the channel availability check starting or
   finishing, so hostapd waits for it and never starts the access point.
