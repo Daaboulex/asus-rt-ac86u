@@ -61,6 +61,7 @@
           pre-commit.settings.hooks.end-of-file-fixer.excludes = [ "^openwrt/patches/" ];
           pre-commit.settings.hooks.typos.settings.config.default.extend-identifiers.MODULE_PARM_DESC =
             "MODULE_PARM_DESC";
+          pre-commit.settings.hooks.typos.settings.config.default.extend-identifiers.sme_state = "sme_state";
 
           packages.default = pkgs.python312.pkgs.callPackage ./package.nix { };
 

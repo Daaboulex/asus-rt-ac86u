@@ -32,7 +32,13 @@ the line says so.
   the cap read back as 9 dBm on every chain of both radios through the
   firmware's `txpwr_target_max`. The image ships `iw-full` for that
   reading, and `test_configured_transmit_power_caps_every_chain` fails
-  when any chain's target exceeds the configured transmit power.
+  when any chain's target exceeds the configured transmit power. On
+  2026-11-13 that test found both radios uncapped after a fresh boot:
+  OpenWrt sets the power before it brings the interface up, and
+  `brcmfmac` refused it there with `-EIO`, logged as `command failed: I/O
+  error (-5)`, so the cap had only held after a Wi-Fi restart. Patch
+  `884-wifi-brcmfmac-apply-a-transmit-power-set-before-bring-up` keeps the
+  request and sends it to the firmware when the interface comes up.
 - The access points run WPA2 only. In Linux 6.18.62 an access point gets
   WPA3 (SAE) only through firmware offload, which `brcmfmac` enables when
   the firmware reports both `idauth` and `sae`; it has no user-space SAE
