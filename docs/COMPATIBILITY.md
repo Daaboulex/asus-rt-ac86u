@@ -93,11 +93,16 @@ the line says so.
   outside that range, or a network on one bridge can carry the other
   bridge's address. Setting `macaddr` on an access point does not help.
   The radio's own address is held by the driver's default interface, so
-  netifd refuses it as "in use". After many networks are added and
-  removed, the firmware also refused a derived address with
-  `brcmf_c_set_cur_etheraddr: Setting cur_etheraddr failed, -52` until
-  the router restarted. A full `wifi down` and `wifi up` gave every
-  network the same address each time.
+  netifd refuses it as "in use". Each bring-up of a second network used
+  to leave a firmware bsscfg behind: the firmware refuses every
+  `interface_create` version, and brcmfmac's query for the version it
+  takes created a bsscfg as a side effect. After a few `wifi down` and
+  `wifi up` the firmware ran out, refused addresses
+  (`Setting cur_etheraddr failed, -52`), beaconed from stale ones and
+  dropped a radio. Since patch 890 a radio holds one bsscfg per access
+  point: on 2026-11-13 six restarts kept both radios at bsscfgs 0 and 2,
+  all four networks on their own addresses, and unloading the driver no
+  longer oopses.
 - A radar (DFS) channel cannot carry an access point. `brcmfmac` announces
   DFS offload but never reports the channel availability check starting or
   finishing, so hostapd cannot finish starting the access point. On

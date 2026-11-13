@@ -8,8 +8,8 @@ NVRAM = "/lib/firmware/brcm/brcmfmac4366c-pcie.asus,rt-ac86u.txt"
 GET_VAR_HEADER = [0x06, 0x01, 0, 0, 0x40, 0, 0, 0, 0x14, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 
 
-def firmware_variable(router, interface: str, name: str) -> list[int]:
-    request = GET_VAR_HEADER + list(name.encode()) + [0]
+def firmware_variable(router, interface: str, name: str, argument: bytes = b"") -> list[int]:
+    request = GET_VAR_HEADER + list(name.encode()) + [0] + list(argument)
     output = router.run(
         f"iw dev {interface} vendor recv 0x001018 0x1 " + " ".join(f"0x{b:02x}" for b in request)
     )
@@ -147,6 +147,49 @@ def test_firmware_beacons_the_rsnxe_hostapd_builds(router):
         checked.append(interface)
     if not checked:
         pytest.skip("no running firmware has the rsnxe iovar")
+
+
+def radio_access_points(router) -> dict[str, list[str]]:
+    found: dict[str, list[str]] = {}
+    running = access_points(router)
+    for phy in router.run("ls /sys/class/ieee80211").split():
+        interfaces = router.run(
+            f"ls /sys/class/ieee80211/{phy}/device/net 2>/dev/null; true"
+        ).split()
+        aps = [i for i in interfaces if f"hostapd.{i}" in running]
+        if aps:
+            found[phy] = sorted(aps)
+    return found
+
+
+def firmware_bsscfgs(router, interface: str) -> list[int]:
+    held = []
+    for index in range(16):
+        try:
+            firmware_variable(router, interface, "bsscfg:bss", index.to_bytes(4, "little"))
+        except AssertionError:
+            continue
+        held.append(index)
+    return held
+
+
+def assert_one_bsscfg_per_access_point(router):
+    radios = radio_access_points(router)
+    if not radios:
+        pytest.skip("no access point is configured")
+    for phy, aps in radios.items():
+        held = firmware_bsscfgs(router, aps[0])
+        assert len(held) == len(aps), f"{phy}: bsscfgs {held} for access points {aps}"
+
+
+def test_firmware_holds_one_bsscfg_per_access_point(router):
+    assert_one_bsscfg_per_access_point(router)
+
+
+@pytest.mark.disruptive
+def test_wifi_restart_keeps_one_bsscfg_per_access_point(router):
+    router.run("wifi down; sleep 5; wifi up; sleep 60", timeout=150)
+    assert_one_bsscfg_per_access_point(router)
 
 
 def test_radios_take_msi_interrupts(router):

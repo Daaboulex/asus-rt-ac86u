@@ -1,0 +1,175 @@
+diff --git a/package/kernel/mac80211/Makefile b/package/kernel/mac80211/Makefile
+index a14061a..13afab0 100644
+--- a/package/kernel/mac80211/Makefile
++++ b/package/kernel/mac80211/Makefile
+@@ -12,7 +12,7 @@ PKG_NAME:=mac80211
+ 
+ PKG_SOURCE_VERSION:=7.2
+ PKG_VERSION:=$(subst -,_,$(PKG_SOURCE_VERSION))
+-PKG_RELEASE:=20
++PKG_RELEASE:=21
+ PKG_LICENSE:=GPL-2.0-only
+ PKG_LICENSE_FILES:=COPYING
+ 
+diff --git a/package/kernel/mac80211/patches/brcm/890-wifi-brcmfmac-create-interfaces-without-querying-interface_create.patch b/package/kernel/mac80211/patches/brcm/890-wifi-brcmfmac-create-interfaces-without-querying-interface_create.patch
+new file mode 100644
+index 0000000..d8cd343
+--- /dev/null
++++ b/package/kernel/mac80211/patches/brcm/890-wifi-brcmfmac-create-interfaces-without-querying-interface_create.patch
+@@ -0,0 +1,156 @@
++From: Daaboulex <39669593+Daaboulex@users.noreply.github.com>
++Subject: [PATCH] wifi: brcmfmac: create interfaces without querying interface_create
++
++When interface_create versions 1 and 2 fail, brcmfmac asks the firmware
++for its supported version with a 4-byte bsscfg get of interface_create.
++Broadcom's BCA firmware for the 4366c0 refuses every version with
++BCME_VERSION and takes that get as a create request: it answers with
++the buffer it got and adds bsscfg 2. The driver then reads a version
++it does not know and falls back to bsscfg:ssid, which adds another
++bsscfg when the first one's event was handled before the fallback
++picked a free index. Each access point bring-up so leaks one bsscfg,
++two interfaces end up bound to one vif, the firmware runs out of
++bsscfgs after a few restarts, and removing the driver frees that vif
++twice.
++
++Try version 3 directly, as Broadcom's own driver does, and fall back as
++before when it fails; firmware that supports version 3 gets the same
++request it got after the query. Refuse an add event for a vif that is
++already bound, so a stray event cannot bind a second interface to it.
++
++---
++--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.c
+++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.c
++@@ -644,7 +644,6 @@
++ 	struct wl_interface_create_v1 iface_v1;
++ 	struct wl_interface_create_v2 iface_v2;
++ 	struct wl_interface_create_v3 iface_v3;
++-	u32 iface_create_ver;
++ 	int err;
++ 
++ 	/* interface_create version 1 */
++@@ -689,40 +688,21 @@
++ 		return 0;
++ 	}
++ 
++-	/* interface_create version 3+ */
++-	/* get supported version from firmware side */
++-	iface_create_ver = 0;
++-	err = brcmf_fil_bsscfg_int_query(ifp, "interface_create",
++-					 &iface_create_ver);
++-	if (err) {
++-		brcmf_err("fail to get supported version, err=%d\n", err);
++-		return -EOPNOTSUPP;
++-	}
++-
++-	switch (iface_create_ver) {
++-	case WL_INTERFACE_CREATE_VER_3:
++-		memset(&iface_v3, 0, sizeof(iface_v3));
++-		iface_v3.ver = WL_INTERFACE_CREATE_VER_3;
++-		iface_v3.flags = WL_INTERFACE_MAC_USE;
++-		iface_v3.iftype = WL_INTERFACE_CREATE_STA;
++-		if (!is_zero_ether_addr(macaddr))
++-			memcpy(iface_v3.mac_addr, macaddr, ETH_ALEN);
++-		else
++-			brcmf_set_vif_sta_macaddr(ifp, iface_v3.mac_addr);
++-
++-		err = brcmf_fil_iovar_data_get(ifp, "interface_create",
++-					       &iface_v3,
++-					       sizeof(iface_v3));
+++	/* interface_create version 3 */
+++	memset(&iface_v3, 0, sizeof(iface_v3));
+++	iface_v3.ver = WL_INTERFACE_CREATE_VER_3;
+++	iface_v3.flags = WL_INTERFACE_MAC_USE;
+++	iface_v3.iftype = WL_INTERFACE_CREATE_STA;
+++	if (!is_zero_ether_addr(macaddr))
+++		memcpy(iface_v3.mac_addr, macaddr, ETH_ALEN);
+++	else
+++		brcmf_set_vif_sta_macaddr(ifp, iface_v3.mac_addr);
++ 
++-		if (!err)
++-			brcmf_dbg(INFO, "interface created(v3)\n");
++-		break;
++-	default:
++-		brcmf_err("not support interface create(v%d)\n",
++-			  iface_create_ver);
++-		err = -EOPNOTSUPP;
++-		break;
++-	}
+++	err = brcmf_fil_iovar_data_get(ifp, "interface_create",
+++				       &iface_v3,
+++				       sizeof(iface_v3));
+++	if (!err)
+++		brcmf_dbg(INFO, "interface created(v3)\n");
++ 
++ 	if (err) {
++ 		brcmf_info("station interface creation failed (%d)\n",
++@@ -738,7 +718,6 @@
++ 	struct wl_interface_create_v1 iface_v1;
++ 	struct wl_interface_create_v2 iface_v2;
++ 	struct wl_interface_create_v3 iface_v3;
++-	u32 iface_create_ver;
++ 	struct brcmf_pub *drvr = ifp->drvr;
++ 	struct brcmf_mbss_ssid_le mbss_ssid_le;
++ 	int bsscfgidx;
++@@ -782,37 +761,18 @@
++ 		return 0;
++ 	}
++ 
++-	/* interface_create version 3+ */
++-	/* get supported version from firmware side */
++-	iface_create_ver = 0;
++-	err = brcmf_fil_bsscfg_int_query(ifp, "interface_create",
++-					 &iface_create_ver);
++-	if (err) {
++-		brcmf_err("fail to get supported version, err=%d\n", err);
++-		return -EOPNOTSUPP;
++-	}
++-
++-	switch (iface_create_ver) {
++-	case WL_INTERFACE_CREATE_VER_3:
++-		memset(&iface_v3, 0, sizeof(iface_v3));
++-		iface_v3.ver = WL_INTERFACE_CREATE_VER_3;
++-		iface_v3.flags = WL_INTERFACE_MAC_USE;
++-		iface_v3.iftype = WL_INTERFACE_CREATE_AP;
++-		brcmf_set_vif_sta_macaddr(ifp, iface_v3.mac_addr);
++-
++-		err = brcmf_fil_iovar_data_get(ifp, "interface_create",
++-					       &iface_v3,
++-					       sizeof(iface_v3));
+++	/* interface_create version 3 */
+++	memset(&iface_v3, 0, sizeof(iface_v3));
+++	iface_v3.ver = WL_INTERFACE_CREATE_VER_3;
+++	iface_v3.flags = WL_INTERFACE_MAC_USE;
+++	iface_v3.iftype = WL_INTERFACE_CREATE_AP;
+++	brcmf_set_vif_sta_macaddr(ifp, iface_v3.mac_addr);
++ 
++-		if (!err)
++-			brcmf_dbg(INFO, "interface created(v3)\n");
++-		break;
++-	default:
++-		brcmf_err("not support interface create(v%d)\n",
++-			  iface_create_ver);
++-		err = -EOPNOTSUPP;
++-		break;
++-	}
+++	err = brcmf_fil_iovar_data_get(ifp, "interface_create",
+++				       &iface_v3,
+++				       sizeof(iface_v3));
+++	if (!err)
+++		brcmf_dbg(INFO, "interface created(v3)\n");
++ 
++ 	if (err) {
++ 		brcmf_info("Does not support interface_create (%d)\n",
++@@ -6864,8 +6824,10 @@
++ 
++ 	switch (ifevent->action) {
++ 	case BRCMF_E_IF_ADD:
++-		/* waiting process may have timed out */
++-		if (!cfg->vif_event.vif) {
+++		/* waiting process may have timed out, or the vif of this
+++		 * request is already bound to an interface
+++		 */
+++		if (!vif || vif->ifp) {
++ 			spin_unlock(&event->vif_event_lock);
++ 			return -EBADF;
++ 		}
