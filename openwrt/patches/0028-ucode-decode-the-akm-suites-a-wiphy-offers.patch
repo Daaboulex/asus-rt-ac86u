@@ -1,0 +1,56 @@
+diff --git a/package/utils/ucode/patches/100-nl80211-decode-the-AKM-suites-a-wiphy-offers.patch b/package/utils/ucode/patches/100-nl80211-decode-the-AKM-suites-a-wiphy-offers.patch
+new file mode 100644
+index 0000000..651df84
+--- /dev/null
++++ b/package/utils/ucode/patches/100-nl80211-decode-the-AKM-suites-a-wiphy-offers.patch
+@@ -0,0 +1,50 @@
++From: Daaboulex <39669593+Daaboulex@users.noreply.github.com>
++Subject: [PATCH] nl80211: decode the AKM suites a wiphy offers
++
++NL80211_ATTR_AKM_SUITES carries an array of u32 suite selectors, but
++was decoded as a single u32, and NL80211_ATTR_IFTYPE_AKM_SUITES, in
++which a driver lists the AKM suites it offers per interface type, was
++not decoded at all. Decode both, so wifi scripts can build an RSNE from
++the AKMs the driver offers in access point mode.
++
++---
++--- a/lib/nl80211.c
+++++ b/lib/nl80211.c
++@@ -638,6 +638,15 @@ static const uc_nl_nested_spec_t nl80211_iftype_ext_capa_entry_nla = {
++ 	}
++ };
++ 
+++static const uc_nl_nested_spec_t nl80211_iftype_akm_suites_entry_nla = {
+++	.headsize = 0,
+++	.nattrs = 2,
+++	.attrs = {
+++		{ NL80211_IFTYPE_AKM_ATTR_IFTYPES, "iftypes", DT_NESTED, 0, &nl80211_ifcomb_limit_types_nla },
+++		{ NL80211_IFTYPE_AKM_ATTR_SUITES, "akm_suites", DT_U32, DF_ARRAY, NULL },
+++	}
+++};
+++
++ static const uc_nl_nested_spec_t nl80211_wiphy_bands_rates_nla = {
++ 	.headsize = 0,
++ 	.nattrs = 2,
++@@ -950,11 +959,11 @@ static const uc_nl_nested_spec_t nl80211_mlo_link_nla = {
++ 
++ static const uc_nl_nested_spec_t nl80211_msg = {
++ 	.headsize = 0,
++-	.nattrs = 139,
+++	.nattrs = 140,
++ 	.attrs = {
++ 		{ NL80211_ATTR_4ADDR, "4addr", DT_U8, 0, NULL },
++ 		{ NL80211_ATTR_AIRTIME_WEIGHT, "airtime_weight", DT_U16, 0, NULL },
++-		{ NL80211_ATTR_AKM_SUITES, "akm_suites", DT_U32, 0, NULL },
+++		{ NL80211_ATTR_AKM_SUITES, "akm_suites", DT_U32, DF_ARRAY, NULL },
++ 		{ NL80211_ATTR_AUTH_TYPE, "auth_type", DT_U32, 0, NULL },
++ 		{ NL80211_ATTR_BANDS, "bands", DT_U32, 0, NULL },
++ 		{ NL80211_ATTR_BEACON_HEAD, "beacon_head", DT_STRING, DF_BINARY, NULL },
++@@ -1087,6 +1096,7 @@ static const uc_nl_nested_spec_t nl80211_msg = {
++ 		{ NL80211_ATTR_MLD_CAPA_AND_OPS, "mld_capa_and_ops", DT_U16, 0, NULL },
++ 		{ NL80211_ATTR_MLO_LINK_ID, "mlo_link_id", DT_U8, 0, NULL },
++ 		{ NL80211_ATTR_IFTYPE_EXT_CAPA, "iftype_ext_capa", DT_NESTED, DF_MULTIPLE|DF_TYPEIDX, &nl80211_iftype_ext_capa_entry_nla },
+++		{ NL80211_ATTR_IFTYPE_AKM_SUITES, "iftype_akm_suites", DT_NESTED, DF_MULTIPLE|DF_AUTOIDX, &nl80211_iftype_akm_suites_entry_nla },
++ 		{ NL80211_ATTR_SURVEY_INFO, "survey_info", DT_NESTED, 0, &nl80211_survey_info_nla },
++ 		{ NL80211_ATTR_WIPHY_RADIOS, "radios", DT_NESTED, DF_MULTIPLE|DF_AUTOIDX, &nl80211_wiphy_radio_nla },
++ 		{ NL80211_ATTR_VIF_RADIO_MASK, "vif_radio_mask", DT_U32, 0, NULL },
