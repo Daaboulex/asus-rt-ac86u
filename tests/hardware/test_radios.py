@@ -103,7 +103,7 @@ def test_configured_transmit_power_caps_every_chain(router):
 
 
 @pytest.mark.disruptive
-@pytest.mark.xfail(reason="brcmfmac reports no CAC events, so hostapd waits on DFS", strict=True)
+@pytest.mark.xfail(reason="on a radar channel the scan stalls; brcmfmac has no CAC", strict=True)
 def test_access_point_starts_on_a_radar_channel(router):
     radio = radio_section(router, RADIO_5G_SLOT)
     channel = router.run(f"uci get wireless.{radio}.channel").strip()

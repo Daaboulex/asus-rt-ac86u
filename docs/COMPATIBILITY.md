@@ -48,7 +48,10 @@ the line says so.
   offload nor the access point handshake offload that `idauth` brings.
 - A radar (DFS) channel cannot carry an access point. `brcmfmac` announces
   DFS offload but never reports the channel availability check starting or
-  finishing, so hostapd waits for it and never starts the access point.
+  finishing, so hostapd cannot finish starting the access point. On
+  2026-11-13, in two runs on channel 52, hostapd did not reach that check:
+  its neighbour scan (`HT_SCAN`) was still running after 90 s, while on
+  channel 36 it ends within 3 s.
   In Linux 6.18.62, `brcmfmac` sets `NL80211_EXT_FEATURE_DFS_OFFLOAD`
   whenever the firmware has 802.11h, calls neither `cfg80211_cac_event`
   nor `cfg80211_radar_event`, and leaves the firmware's `DFS_AP_STOP` and
