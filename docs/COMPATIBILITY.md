@@ -46,6 +46,13 @@ the line says so.
   the firmware reports both `idauth` and `sae`; it has no user-space SAE
   for access points. On firmware 10.28.2 `iw phy` lists neither SAE
   offload nor the access point handshake offload that `idauth` brings.
+  ASUS's own firmware does not offer WPA3 on this model either. Its
+  newest radio firmware, 10.10.122.20 inside `dhd.ko` of release
+  3.0.0.4.386.52334, carries `mfp` but not `sae` among its build tags. The
+  image ships no hostapd, its `nas` and `eapd` authenticators hold no SAE
+  code, and its `rc` never declares the `wpa3` capability its web pages
+  check for. This was read from the image's files on 2026-11-13, not by
+  running it.
 - A radar (DFS) channel cannot carry an access point. `brcmfmac` announces
   DFS offload but never reports the channel availability check starting or
   finishing, so hostapd cannot finish starting the access point. On
