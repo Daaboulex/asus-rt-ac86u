@@ -114,6 +114,41 @@ def test_station_dump_carries_signal_rates_and_counters(router):
         pytest.skip("no station is associated")
 
 
+def hostapd_bss(router, interface: str) -> dict[str, str]:
+    phy = interface.split("-")[0]
+    fields: dict[str, str] = {}
+    inside = False
+    for line in router.run(f"cat /var/run/hostapd-{phy}.conf").splitlines():
+        key, _, value = line.partition("=")
+        if key in ("interface", "bss"):
+            inside = value == interface
+        elif inside:
+            fields[key] = value
+    return fields
+
+
+def test_firmware_beacons_the_rsnxe_hostapd_builds(router):
+    checked = []
+    for ap in access_points(router):
+        interface = ap.removeprefix("hostapd.")
+        if not interface.endswith("-ap0"):
+            continue
+        try:
+            held = firmware_variable(router, interface, "rsnxe")
+        except AssertionError:
+            continue
+        bss = hostapd_bss(router, interface)
+        h2e = "SAE" in bss.get("wpa_key_mgmt", "").split() and bss.get("sae_pwe", "2") in ("1", "2")
+        element = held[4 : 6 + held[5]] if len(held) > 5 and held[4] == 0xF4 else []
+        if h2e:
+            assert element and element[2] & 0x20, f"{interface}: firmware holds {element}"
+        else:
+            assert not element or not element[2] & 0x20, f"{interface}: firmware holds {element}"
+        checked.append(interface)
+    if not checked:
+        pytest.skip("no running firmware has the rsnxe iovar")
+
+
 def test_radios_take_msi_interrupts(router):
     lines = [
         line

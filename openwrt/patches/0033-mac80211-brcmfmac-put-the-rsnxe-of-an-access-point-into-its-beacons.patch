@@ -1,0 +1,75 @@
+diff --git a/package/kernel/mac80211/Makefile b/package/kernel/mac80211/Makefile
+index 27d1dd7..4141d37 100644
+--- a/package/kernel/mac80211/Makefile
++++ b/package/kernel/mac80211/Makefile
+@@ -12,7 +12,7 @@ PKG_NAME:=mac80211
+ 
+ PKG_SOURCE_VERSION:=7.2
+ PKG_VERSION:=$(subst -,_,$(PKG_SOURCE_VERSION))
+-PKG_RELEASE:=18
++PKG_RELEASE:=19
+ PKG_LICENSE:=GPL-2.0-only
+ PKG_LICENSE_FILES:=COPYING
+ 
+diff --git a/package/kernel/mac80211/patches/brcm/889-wifi-brcmfmac-put-the-RSNXE-of-an-access-point-into-its-beacons.patch b/package/kernel/mac80211/patches/brcm/889-wifi-brcmfmac-put-the-RSNXE-of-an-access-point-into-its-beacons.patch
+new file mode 100644
+index 0000000..df38c09
+--- /dev/null
++++ b/package/kernel/mac80211/patches/brcm/889-wifi-brcmfmac-put-the-RSNXE-of-an-access-point-into-its-beacons.patch
+@@ -0,0 +1,56 @@
++From: Daaboulex <39669593+Daaboulex@users.noreply.github.com>
++Subject: [PATCH] wifi: brcmfmac: put the RSNXE of an access point into its beacons
++
++hostapd places an RSN Extension element in the beacon tail of an access
++point that offers SAE hash-to-element (sae_pwe 1 or 2). brcmfmac hands
++the firmware only the RSN, WPA and vendor elements, so the beacon and
++the probe responses the firmware builds go out without the RSNXE.
++Stations then run SAE with hunting-and-pecking while hostapd expects
++H2E, and hostapd drops them for indicating H2E without using it.
++
++Firmware that knows the element takes it through the rsnxe iovar, as
++Broadcom's own driver does when it starts an access point; BCM4366
++firmware 10.10.131.116 is one. Hand it the element from the beacon
++tail, or clear it when the beacon has none so a restart without H2E
++does not keep it. Firmware without the iovar keeps sending beacons
++without the element, as before, and the error says so.
++
++---
++--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.c
+++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.c
++@@ -5156,6 +5156,26 @@
++ 	return err;
++ }
++ 
+++static void brcmf_configure_rsnxe(struct brcmf_if *ifp,
+++				  struct cfg80211_ap_settings *settings)
+++{
+++	const struct brcmf_tlv *rsnxe;
+++	s32 err;
+++
+++	rsnxe = brcmf_parse_tlvs((u8 *)settings->beacon.tail,
+++				 settings->beacon.tail_len, WLAN_EID_RSNX);
+++	if (!rsnxe) {
+++		brcmf_fil_bsscfg_data_set(ifp, "rsnxe", NULL, 0);
+++		return;
+++	}
+++
+++	err = brcmf_fil_bsscfg_data_set(ifp, "rsnxe", (void *)rsnxe,
+++					rsnxe->len + TLV_HDR_LEN);
+++	if (err)
+++		bphy_err(ifp->drvr, "firmware takes no RSNXE, beacons go without it (%d)\n",
+++			 err);
+++}
+++
++ static s32
++ brcmf_parse_configure_security(struct brcmf_if *ifp,
++ 			       struct cfg80211_ap_settings *settings,
++@@ -5195,6 +5215,8 @@
++ 		brcmf_configure_opensecurity(ifp);
++ 	}
++ 
+++	brcmf_configure_rsnxe(ifp, settings);
+++
++ 	return err;
++ }
++ 
