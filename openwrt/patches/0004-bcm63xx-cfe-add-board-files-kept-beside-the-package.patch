@@ -1,7 +1,16 @@
 diff --git a/package/kernel/bcm63xx-cfe/Makefile b/package/kernel/bcm63xx-cfe/Makefile
-index 0187dc8..cccf764 100644
+index 0187dc8..4824ccf 100644
 --- a/package/kernel/bcm63xx-cfe/Makefile
 +++ b/package/kernel/bcm63xx-cfe/Makefile
+@@ -2,7 +2,7 @@ include $(TOPDIR)/rules.mk
+ include $(INCLUDE_DIR)/kernel.mk
+ 
+ PKG_NAME:=bcm63xx-cfe
+-PKG_RELEASE:=1
++PKG_RELEASE:=2
+ 
+ PKG_SOURCE_URL:=https://github.com/openwrt/bcm63xx-cfe.git
+ PKG_SOURCE_PROTO:=git
 @@ -26,6 +26,11 @@ define Package/bcm63xx-cfe/description
    CFE RAM binaries for bcm63xx.
  endef

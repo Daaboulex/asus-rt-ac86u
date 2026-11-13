@@ -1,3 +1,16 @@
+diff --git a/package/network/config/wifi-scripts/Makefile b/package/network/config/wifi-scripts/Makefile
+index 5637a82..e3e1b88 100644
+--- a/package/network/config/wifi-scripts/Makefile
++++ b/package/network/config/wifi-scripts/Makefile
+@@ -9,7 +9,7 @@ include $(TOPDIR)/rules.mk
+ 
+ PKG_NAME:=wifi-scripts
+ PKG_VERSION:=1.0
+-PKG_RELEASE:=4
++PKG_RELEASE:=5
+ PKG_LICENSE:=GPL-2.0
+ 
+ PKG_MAINTAINER:=Felix Fietkau <nbd@nbd.name>
 diff --git a/package/network/config/wifi-scripts/files-ucode/usr/share/ucode/wifi/ap.uc b/package/network/config/wifi-scripts/files-ucode/usr/share/ucode/wifi/ap.uc
 index 3afc200..3493845 100644
 --- a/package/network/config/wifi-scripts/files-ucode/usr/share/ucode/wifi/ap.uc

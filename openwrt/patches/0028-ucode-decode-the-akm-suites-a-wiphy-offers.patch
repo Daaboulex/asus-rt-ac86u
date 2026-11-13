@@ -1,3 +1,16 @@
+diff --git a/package/utils/ucode/Makefile b/package/utils/ucode/Makefile
+index 97357b3..6dfb79c 100644
+--- a/package/utils/ucode/Makefile
++++ b/package/utils/ucode/Makefile
+@@ -8,7 +8,7 @@
+ include $(TOPDIR)/rules.mk
+ 
+ PKG_NAME:=ucode
+-PKG_RELEASE:=1
++PKG_RELEASE:=2
+ 
+ PKG_SOURCE_PROTO:=git
+ PKG_SOURCE_URL=https://github.com/ucode-lang/ucode.git
 diff --git a/package/utils/ucode/patches/100-nl80211-decode-the-AKM-suites-a-wiphy-offers.patch b/package/utils/ucode/patches/100-nl80211-decode-the-AKM-suites-a-wiphy-offers.patch
 new file mode 100644
 index 0000000..651df84

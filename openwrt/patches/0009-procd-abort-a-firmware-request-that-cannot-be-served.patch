@@ -1,3 +1,16 @@
+diff --git a/package/system/procd/Makefile b/package/system/procd/Makefile
+index 1a6754b..53a2a59 100644
+--- a/package/system/procd/Makefile
++++ b/package/system/procd/Makefile
+@@ -8,7 +8,7 @@
+ include $(TOPDIR)/rules.mk
+ 
+ PKG_NAME:=procd
+-PKG_RELEASE:=2
++PKG_RELEASE:=3
+ 
+ PKG_SOURCE_PROTO:=git
+ PKG_SOURCE_URL=$(PROJECT_GIT)/project/procd.git
 diff --git a/package/system/procd/patches/100-hotplug-abort-a-firmware-request-that-cannot-be-served.patch b/package/system/procd/patches/100-hotplug-abort-a-firmware-request-that-cannot-be-served.patch
 new file mode 100644
 index 0000000..4a242ae
