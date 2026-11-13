@@ -98,10 +98,21 @@ in the package build; the tests in `tests/hardware` run against a router.
   (2026-11-12).
 - The BCM7038-style watchdog resets the whole SoC: with procd's pings
   stopped the unit rebooted about 25 s later (2026-11-12).
-- About one boot in five, cold or warm, stalls inside the first probe of
-  the `brcm-sf2` switch driver, before userspace; the lockup detector
-  catches it, and the panic record written during it comes out garbled
-  in flash (boot-LED checkpoints and misc3 records, 2026-11-10 to 12).
+- Before patch 0021, about one boot in five to seven, cold or warm, failed
+  inside the first probe of the `brcm-sf2` switch driver, before userspace
+  (boot-LED checkpoints and misc3 records, 2026-11-10 to 12). With 0021
+  one warm boot in 78 came back more than 110 s after going down
+  (2026-11-12), a measure that misses a crash the watchdog recovers
+  sooner. Counted by misc3 records instead, 8 of 90 warm resets of image
+  49af869, which carries 0021, went through a crashed boot before coming
+  up (2026-11-13, 30 each of `reboot`, a stopped watchdog and a
+  deliberate panic). Every record shows the same
+  synchronous external abort, ESR 0x96000210, and the seven readable ones
+  name `bcm_sf2_crossbar_setup+0x10`. That is the read of `REG_CROSSBAR`,
+  offset 0xc8 in the switch's `reg` block, and the first access to that
+  block after `bcm_sf2_sw_rst()` resets the chip with `EN_CHIP_RST`. The
+  kernel panics, and the watchdog brings the unit back. Some records come
+  out garbled in flash.
 - Stock CFE RAM stage: `cferam.005`, 361932 bytes, image version HND3221458,
   SHA256 6427360d...4b12. It differs from the GT-AC5300 one in
   `bcm63xx-cfe` (355110 bytes).
