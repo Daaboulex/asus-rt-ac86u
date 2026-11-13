@@ -112,7 +112,10 @@ in the package build; the tests in `tests/hardware` run against a router.
   offset 0xc8 in the switch's `reg` block, and the first access to that
   block after `bcm_sf2_sw_rst()` resets the chip with `EN_CHIP_RST`. The
   kernel panics, and the watchdog brings the unit back. Some records come
-  out garbled in flash.
+  out garbled in flash. Patch 0023 sleeps 20 ms after that reset on the
+  BCM4908: with it, 90 warm resets of the same kinds left no crash record,
+  while each of the 30 deliberate panics among them left its own
+  (2026-11-13). Cold boots have not been counted with it.
 - Stock CFE RAM stage: `cferam.005`, 361932 bytes, image version HND3221458,
   SHA256 6427360d...4b12. It differs from the GT-AC5300 one in
   `bcm63xx-cfe` (355110 bytes).
