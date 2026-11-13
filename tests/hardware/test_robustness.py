@@ -51,8 +51,9 @@ def test_a_panic_reboots_and_leaves_a_record(router):
         "(sleep 1; echo c > /proc/sysrq-trigger) > /dev/null 2>&1 &"
     )
     router.wait_for_new_boot(old, limit=240)
-    records = router.run("cat /sys/fs/pstore/* 2>/dev/null; true")
-    assert marker in records
+    holding = router.run(f"grep -l '{marker}' /sys/fs/pstore/* 2>/dev/null; true").split()
+    assert holding, f"no record in /sys/fs/pstore holds {marker!r}"
+    router.run("rm " + " ".join(holding))
 
 
 @pytest.mark.destructive

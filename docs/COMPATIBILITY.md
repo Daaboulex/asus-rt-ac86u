@@ -70,7 +70,13 @@ the line says so.
   reset; the measurement is under "Hardware facts" in
   [`DESIGN.md`](./DESIGN.md). The kernel keeps its panic records in flash, on
   the vendor partition `misc3`: `test_panic_records_go_to_misc3` and
-  `test_a_panic_reboots_and_leaves_a_record`.
+  `test_a_panic_reboots_and_leaves_a_record`. `misc3` holds 16 records of
+  64 KiB, and a panic can only write into an empty one, because nothing
+  can be erased during a panic (`mtdpstore.c`); a record's space comes
+  back only when its file is deleted from `/sys/fs/pstore`. Nothing on
+  the router deletes them yet, so after 16 panics a new one leaves no
+  record. On 2026-11-13 the store was full and lost a panic; the 15 old
+  records were copied off and deleted.
 - A kernel module cannot be added after flashing. OpenWrt's package feed
   builds its modules against its own kernel build, and `apk` hides every one
   of them on this image: on 2026-11-12 the image's kernel package was
