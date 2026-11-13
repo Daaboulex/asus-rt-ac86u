@@ -81,6 +81,17 @@ def test_channel_survey_reports_busy_time(router):
         assert "channel busy time" in router.run(f"iw dev {interface} survey dump"), interface
 
 
+def test_radios_take_msi_interrupts(router):
+    lines = [
+        line
+        for line in router.run("cat /proc/interrupts").splitlines()
+        if "brcmf_pcie_intr" in line
+    ]
+    assert len(lines) == 2, lines
+    for line in lines:
+        assert "MSI" in line, line
+
+
 def test_configured_transmit_power_caps_every_chain(router):
     found = phys(router)
     checked = []

@@ -218,7 +218,9 @@ radios capped at 9 dBm per chain.
   Mbit/s from the laptop and 544 Mbit/s to it, with both cores about 60 %
   busy. Moving the 5 GHz radio's interrupt to core 1
   (`/proc/irq/23/smp_affinity` 2) dropped the upload to 477 Mbit/s with
-  core 1 at 96 %, so the interrupts stay where the kernel puts them.
+  core 1 at 96 %. Both were measured on the radios' legacy INTx line;
+  they now take MSI vectors, which the PCIe controller's MSI domain
+  gives no affinity.
 - Routing load: 164 to 200 Mbit/s of download through NAT from that
   laptop kept the router about 30 % busy, and software flow offload
   (`flow_offloading` 1) changed neither the rate nor the load, so it

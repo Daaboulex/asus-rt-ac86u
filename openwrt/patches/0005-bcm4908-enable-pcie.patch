@@ -62,69 +62,96 @@ index e6179ae..4d469f6 100644
  CONFIG_RWSEM_SPIN_ON_OWNER=y
 diff --git a/target/linux/bcm4908/patches-6.18/312-arm64-dts-broadcom-bcm4908-add-PCIe-controllers.patch b/target/linux/bcm4908/patches-6.18/312-arm64-dts-broadcom-bcm4908-add-PCIe-controllers.patch
 new file mode 100644
-index 0000000..f1606bc
+index 0000000..b220001
 --- /dev/null
 +++ b/target/linux/bcm4908/patches-6.18/312-arm64-dts-broadcom-bcm4908-add-PCIe-controllers.patch
-@@ -0,0 +1,67 @@
+@@ -0,0 +1,94 @@
 +From: Daaboulex <39669593+Daaboulex@users.noreply.github.com>
 +Subject: [PATCH] arm64: dts: broadcom: bcm4908: add PCIe controllers
 +
-+BCM4908 has PCIe controllers at 0x80040000 and 0x80050000, each with
-+its PMB power domain and a PERST line in the misc reset controller.
-+Outbound windows sit at 0xc0000000 and 0xd0000000. Boards enable the
++BCM4908 has PCIe controllers at 0x80040000 and 0x80050000 on the SoC
++bus, each with its PMB power domain and a PERST line in the misc reset
++controller. Their outbound windows sit at 0xc0000000 and 0xd0000000,
++which the SoC bus maps beside its registers. Each controller gathers
++INTA to INTD and its MSIs into one interrupt, so every pin and the
++built-in MSI controller name that one GIC line. The MSI handler is
++chained to that line, so while MSI is on a device without MSI cannot
++request its INTx; the radios on these boards use MSI. Boards enable the
 +ones they wire.
 +
 +---
 +--- a/arch/arm64/boot/dts/broadcom/bcmbca/bcm4908.dtsi
 ++++ b/arch/arm64/boot/dts/broadcom/bcmbca/bcm4908.dtsi
-+@@ -323,6 +323,46 @@
-+ 		};
-+ 	};
-+ 
-++	pcie0: pcie@80040000 {
-++		compatible = "brcm,bcm4908-pcie";
-++		reg = <0x00 0x80040000 0x00 0xa000>;
-++		device_type = "pci";
-++		#address-cells = <3>;
-++		#size-cells = <2>;
-++		#interrupt-cells = <1>;
-++		interrupts = <GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>;
-++		interrupt-names = "pcie";
-++		interrupt-map-mask = <0 0 0 7>;
-++		interrupt-map = <0 0 0 1 &gic GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>;
-++		ranges = <0x02000000 0x00 0xc0000000 0x00 0xc0000000 0x00 0x10000000>;
-++		power-domains = <&pmb BCM_PMB_PCIE0>;
-++		resets = <&pcie_reset 0>;
-++		reset-names = "perst";
-++		linux,pci-domain = <0>;
-++		bus-range = <0x00 0xff>;
-++		status = "disabled";
-++	};
-++
-++	pcie1: pcie@80050000 {
-++		compatible = "brcm,bcm4908-pcie";
-++		reg = <0x00 0x80050000 0x00 0xa000>;
-++		device_type = "pci";
-++		#address-cells = <3>;
-++		#size-cells = <2>;
-++		#interrupt-cells = <1>;
-++		interrupts = <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>;
-++		interrupt-names = "pcie";
-++		interrupt-map-mask = <0 0 0 7>;
-++		interrupt-map = <0 0 0 1 &gic GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>;
-++		ranges = <0x02000000 0x00 0xd0000000 0x00 0xd0000000 0x00 0x10000000>;
-++		power-domains = <&pmb BCM_PMB_PCIE1>;
-++		resets = <&pcie_reset 1>;
-++		reset-names = "perst";
-++		linux,pci-domain = <1>;
-++		bus-range = <0x00 0xff>;
-++		status = "disabled";
-++	};
-++
-+ 	/* PERF Peripherals */
-+ 	bus@ff800000 {
++@@ -130,7 +130,8 @@
 + 		compatible = "simple-bus";
-+@@ -727,7 +767,7 @@
++ 		#address-cells = <1>;
++ 		#size-cells = <1>;
++-		ranges = <0x00 0x00 0x80000000 0x281000>;
+++		ranges = <0x00 0x00 0x80000000 0x281000>,
+++			 <0xc0000000 0x00 0xc0000000 0x20000000>;
++ 
++ 		enet: ethernet@2000 {
++ 			compatible = "brcm,bcm4908-enet";
++@@ -216,6 +217,58 @@
++ 			};
++ 		};
++ 
+++		pcie0: pcie@40000 {
+++			compatible = "brcm,bcm4908-pcie";
+++			reg = <0x40000 0xa000>;
+++			ranges = <0x02000000 0x00 0xc0000000 0xc0000000 0x00 0x10000000>;
+++			device_type = "pci";
+++			#address-cells = <3>;
+++			#size-cells = <2>;
+++			#interrupt-cells = <1>;
+++			interrupts = <GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>,
+++				     <GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>;
+++			interrupt-names = "pcie", "msi";
+++			interrupt-map-mask = <0 0 0 7>;
+++			interrupt-map = <0 0 0 1 &gic GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>,
+++					<0 0 0 2 &gic GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>,
+++					<0 0 0 3 &gic GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>,
+++					<0 0 0 4 &gic GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>;
+++			msi-controller;
+++			msi-parent = <&pcie0>;
+++			power-domains = <&pmb BCM_PMB_PCIE0>;
+++			resets = <&pcie_reset 0>;
+++			reset-names = "perst";
+++			bus-range = <0x00 0xff>;
+++			linux,pci-domain = <0>;
+++			status = "disabled";
+++		};
+++
+++		pcie1: pcie@50000 {
+++			compatible = "brcm,bcm4908-pcie";
+++			reg = <0x50000 0xa000>;
+++			ranges = <0x02000000 0x00 0xd0000000 0xd0000000 0x00 0x10000000>;
+++			device_type = "pci";
+++			#address-cells = <3>;
+++			#size-cells = <2>;
+++			#interrupt-cells = <1>;
+++			interrupts = <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>,
+++				     <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>;
+++			interrupt-names = "pcie", "msi";
+++			interrupt-map-mask = <0 0 0 7>;
+++			interrupt-map = <0 0 0 1 &gic GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>,
+++					<0 0 0 2 &gic GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>,
+++					<0 0 0 3 &gic GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>,
+++					<0 0 0 4 &gic GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>;
+++			msi-controller;
+++			msi-parent = <&pcie1>;
+++			power-domains = <&pmb BCM_PMB_PCIE1>;
+++			resets = <&pcie_reset 1>;
+++			reset-names = "perst";
+++			bus-range = <0x00 0xff>;
+++			linux,pci-domain = <1>;
+++			status = "disabled";
+++		};
+++
++ 		bus@80000 {
++ 			compatible = "simple-bus";
++ 			#size-cells = <1>;
++@@ -727,7 +780,7 @@
 + 			#size-cells = <1>;
 + 			ranges = <0x00 0x2600 0xe4>;
 + 
@@ -135,33 +162,22 @@ index 0000000..f1606bc
 + 				#reset-cells = <1>;
 diff --git a/target/linux/bcm4908/patches-6.18/810-PCI-brcmstb-map-BCM4908-inbound-windows-through-UBUS.patch b/target/linux/bcm4908/patches-6.18/810-PCI-brcmstb-map-BCM4908-inbound-windows-through-UBUS.patch
 new file mode 100644
-index 0000000..3528bac
+index 0000000..d23e0ce
 --- /dev/null
 +++ b/target/linux/bcm4908/patches-6.18/810-PCI-brcmstb-map-BCM4908-inbound-windows-through-UBUS.patch
-@@ -0,0 +1,87 @@
+@@ -0,0 +1,82 @@
 +From: Daaboulex <39669593+Daaboulex@users.noreply.github.com>
 +Subject: [PATCH] PCI: brcmstb: Map BCM4908 inbound windows through UBUS
 +
 +BCM4908 reaches system memory over UBUS like BCM7712: each inbound
 +BAR needs its UBUS remap register, and BAR1 carries the memory view
 +instead of being disabled. Without it a device on the bus sees its
-+DMA writes go nowhere. Legacy INTx is also masked in CPU_INTR1 out
-+of reset, so a post-setup hook unmasks INTA to INTD.
++DMA writes go nowhere.
 +
 +---
 +--- a/drivers/pci/controller/pcie-brcmstb.c
 ++++ b/drivers/pci/controller/pcie-brcmstb.c
-+@@ -148,6 +148,9 @@
-+ 
-+ #define PCIE_MSI_INTR2_BASE		0x4500
-+ 
-++#define PCIE_CPU_INTR1_INTR_MASK_CLEAR	0x940c
-++#define  PCIE_CPU_INTR1_INTX_MASK	GENMASK(4, 1)
-++
-+ /* Offsets from INTR2_CPU and MSI_INTR2 BASE offsets */
-+ #define  MSI_INT_STATUS			0x0
-+ #define  MSI_INT_CLR			0x8
-+@@ -832,6 +835,20 @@
++@@ -832,6 +832,12 @@
 + 	return 0;
 + }
 + 
@@ -171,18 +187,17 @@ index 0000000..3528bac
 ++	       pcie->cfg->soc_base == BCM4908;
 ++}
 ++
-++static int brcm_pcie_post_setup_bcm4908(struct brcm_pcie *pcie)
-++{
-++	writel(PCIE_CPU_INTR1_INTX_MASK,
-++	       pcie->base + PCIE_CPU_INTR1_INTR_MASK_CLEAR);
-++
-++	return 0;
-++}
-++
 + static int brcm_pcie_post_setup_bcm2712(struct brcm_pcie *pcie)
 + {
 + 	static const u16 data[] = { 0x50b9, 0xbda1, 0x0094, 0x97b4, 0x5030,
-+@@ -899,7 +916,7 @@
++@@ -893,13 +899,13 @@
++ 	struct inbound_win *b = b_begin;
++ 
++ 	/*
++-	 * STB chips beside 7712 disable the first inbound window default.
+++	 * STB chips beside 7712 and 4908 disable the first inbound window default.
++ 	 * Rather being mapped to system memory it is mapped to the
++ 	 * internal registers of the SoC.  This feature is deprecated, has
 + 	 * security considerations, and is not implemented in our modern
 + 	 * SoCs.
 + 	 */
@@ -191,7 +206,13 @@ index 0000000..3528bac
 + 		add_inbound_win(b++, &n, 0, 0, 0);
 + 
 + 	resource_list_for_each_entry(entry, &bridge->dma_ranges) {
-+@@ -916,7 +933,7 @@
++@@ -911,12 +917,12 @@
++ 		if (pcie_start < lowest_pcie_addr)
++ 			lowest_pcie_addr = pcie_start;
++ 		/*
++-		 * 7712 and newer chips may have many BARs, with each
+++		 * 7712, 4908 and newer chips may have many BARs, with each
++ 		 * offering a non-overlapping viewport to system memory.
 + 		 * That being said, each BARs size must still be a power of
 + 		 * two.
 + 		 */
@@ -200,7 +221,12 @@ index 0000000..3528bac
 + 			add_inbound_win(b++, &n, size, cpu_start, pcie_start);
 + 
 + 		if (n > pcie->cfg->num_inbound_wins)
-+@@ -933,7 +950,7 @@
++@@ -929,11 +935,11 @@
++ 	}
++ 
++ 	/*
++-	 * 7712 and newer chips do not have an internal memory mapping system
+++	 * 7712, 4908 and newer chips do not have an internal memory mapping system
 + 	 * that enables multiple memory controllers.  As such, it can return
 + 	 * now w/o doing special configuration.
 + 	 */
@@ -209,8 +235,12 @@ index 0000000..3528bac
 + 		return n;
 + 
 + 	ret = of_property_read_variable_u64_array(pcie->np, "brcm,scb-sizes", pcie->memc_size, 1,
-+@@ -1056,7 +1073,7 @@
-+ 		 * 7712:
++@@ -1053,10 +1059,10 @@
++ 		/*
++ 		 * Most STB chips:
++ 		 *     Do nothing.
++-		 * 7712:
+++		 * 7712 and 4908:
 + 		 *     All of their BARs need to be set.
 + 		 */
 +-		if (pcie->cfg->soc_base == BCM7712) {
@@ -218,7 +248,52 @@ index 0000000..3528bac
 + 			/* BUS remap register settings */
 + 			reg_offset = brcm_ubus_reg_offset(i);
 + 			tmp = lower_32_bits(cpu_addr) & ~0xfff;
-+@@ -1787,6 +1804,7 @@
+diff --git a/target/linux/bcm4908/patches-6.18/816-PCI-brcmstb-unmask-the-BCM4908-interrupts-in-CPU_INTR1.patch b/target/linux/bcm4908/patches-6.18/816-PCI-brcmstb-unmask-the-BCM4908-interrupts-in-CPU_INTR1.patch
+new file mode 100644
+index 0000000..84e7bed
+--- /dev/null
++++ b/target/linux/bcm4908/patches-6.18/816-PCI-brcmstb-unmask-the-BCM4908-interrupts-in-CPU_INTR1.patch
+@@ -0,0 +1,47 @@
++From: Daaboulex <39669593+Daaboulex@users.noreply.github.com>
++Subject: [PATCH] PCI: brcmstb: Unmask the BCM4908 interrupts in CPU_INTR1
++
++BCM4908 gathers each controller's INTA to INTD and MSI interrupts in
++CPU_INTR1, and leaves them masked there, so neither a legacy interrupt
++nor an MSI reaches the GIC. Unmask the four INTx lines and the MSI line
++after setup. The MSI vectors stay masked in MSI_INTR2 until the MSI
++code enables them. A function with MSI enabled does not signal INTx,
++so the open INTx lines stay quiet while MSI owns the shared line.
++
++---
++--- a/drivers/pci/controller/pcie-brcmstb.c
+++++ b/drivers/pci/controller/pcie-brcmstb.c
++@@ -148,6 +148,10 @@
++ 
++ #define PCIE_MSI_INTR2_BASE		0x4500
++ 
+++#define PCIE_CPU_INTR1_INTR_MASK_CLEAR	0x940c
+++#define  PCIE_CPU_INTR1_INTX_MASK	GENMASK(4, 1)
+++#define  PCIE_CPU_INTR1_MSI_INTR	BIT(9)
+++
++ /* Offsets from INTR2_CPU and MSI_INTR2 BASE offsets */
++ #define  MSI_INT_STATUS			0x0
++ #define  MSI_INT_CLR			0x8
++@@ -838,6 +842,14 @@
++ 	       pcie->cfg->soc_base == BCM4908;
++ }
++ 
+++static int brcm_pcie_post_setup_bcm4908(struct brcm_pcie *pcie)
+++{
+++	writel(PCIE_CPU_INTR1_INTX_MASK | PCIE_CPU_INTR1_MSI_INTR,
+++	       pcie->base + PCIE_CPU_INTR1_INTR_MASK_CLEAR);
+++
+++	return 0;
+++}
+++
++ static int brcm_pcie_post_setup_bcm2712(struct brcm_pcie *pcie)
++ {
++ 	static const u16 data[] = { 0x50b9, 0xbda1, 0x0094, 0x97b4, 0x5030,
++@@ -1793,6 +1805,7 @@
 + 	.soc_base	= BCM4908,
 + 	.perst_set	= brcm_pcie_perst_set_4908,
 + 	.bridge_sw_init_set = brcm_pcie_bridge_sw_init_set_generic,
@@ -228,7 +303,7 @@ index 0000000..3528bac
 + 
 diff --git a/target/linux/bcm4908/patches-6.18/313-arm64-dts-broadcom-bcmbca-rt-ac86u-enable-PCIe.patch b/target/linux/bcm4908/patches-6.18/313-arm64-dts-broadcom-bcmbca-rt-ac86u-enable-PCIe.patch
 new file mode 100644
-index 0000000..ff8e143
+index 0000000..96a7b31
 --- /dev/null
 +++ b/target/linux/bcm4908/patches-6.18/313-arm64-dts-broadcom-bcmbca-rt-ac86u-enable-PCIe.patch
 @@ -0,0 +1,27 @@
@@ -249,13 +324,13 @@ index 0000000..ff8e143
 + };
 ++
 ++&pcie0 {
-++	dma-ranges = <0x02000000 0x00 0x00000000 0x00 0x00000000 0x00 0x20000000>;
+++	dma-ranges = <0x02000000 0x00 0x00000000 0x00000000 0x00 0x20000000>;
 ++	brcm,enable-ssc;
 ++	status = "okay";
 ++};
 ++
 ++&pcie1 {
-++	dma-ranges = <0x02000000 0x00 0x00000000 0x00 0x00000000 0x00 0x20000000>;
+++	dma-ranges = <0x02000000 0x00 0x00000000 0x00000000 0x00 0x20000000>;
 ++	brcm,enable-ssc;
 ++	status = "okay";
 ++};
