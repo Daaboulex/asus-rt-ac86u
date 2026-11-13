@@ -155,7 +155,12 @@ radios capped at 9 dBm per chain.
   raised the ping by about 13 ms unshaped, so the download is left
   unshaped. Routed through the router's NAT from a laptop on its 5 GHz,
   a saturating upload kept the ping at 16.7 ms on average against 16.9 ms
-  idle, so the shaping holds for forwarded traffic too.
+  idle, so the shaping holds for forwarded traffic too. `qosify` in place
+  of `sqm-scripts`, at the same rate with `overhead_type manual`,
+  `overhead 34`, `noatm` and `diffserv4`, held a wired client at 14.8 to
+  16.1 ms on average under a saturating upload across three runs on
+  2026-11-13, against 15.0 ms for `sqm-scripts` the same hour, while
+  sorting traffic into four priority tins.
 - Wi-Fi to the router itself, from a laptop on 5 GHz at -45 dBm with an
   866 Mbit/s link, `iperf3 -P 4` against `iperf3 -s` on the router: 644
   Mbit/s from the laptop and 544 Mbit/s to it, with both cores about 60 %
