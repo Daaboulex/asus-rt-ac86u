@@ -53,6 +53,23 @@ the line says so.
   code, and its `rc` never declares the `wpa3` capability its web pages
   check for. This was read from the image's files on 2026-11-13, not by
   running it.
+- Protected management frames (802.11w) break the access point. With
+  `ieee80211w '1'` the firmware's beacons still carry its own RSN element
+  while hostapd sends its own, with the PMF bits, in the handshake. On
+  2026-11-13 a client failed the handshake with reason 17 (the element
+  differs), with its own PMF on or off, and phones reported a wrong
+  password.
+- Each access point takes an address the scripts derive from the radio's
+  own one, and a rebuild that re-adds only one of a radio's networks can
+  hand the networks each other's addresses. A bridge address must lie
+  outside that range, or a network on one bridge can carry the other
+  bridge's address. Setting `macaddr` on an access point does not help.
+  The radio's own address is held by the driver's default interface, so
+  netifd refuses it as "in use". After many networks are added and
+  removed, the firmware also refused a derived address with
+  `brcmf_c_set_cur_etheraddr: Setting cur_etheraddr failed, -52` until
+  the router restarted. A full `wifi down` and `wifi up` gave every
+  network the same address each time.
 - A radar (DFS) channel cannot carry an access point. `brcmfmac` announces
   DFS offload but never reports the channel availability check starting or
   finishing, so hostapd cannot finish starting the access point. On
