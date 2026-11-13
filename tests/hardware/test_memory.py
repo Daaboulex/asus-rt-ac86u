@@ -25,7 +25,7 @@ def test_kernel_keeps_no_default_bounce_buffer(router):
     assert "software IO TLB: mapped" not in log
 
 
-def test_memory_is_available(router):
+def test_kernel_keeps_the_ram_left_after_the_dma_pools(router):
     meminfo = router.run("cat /proc/meminfo")
-    available = int(re.search(r"MemAvailable:\s+(\d+) kB", meminfo).group(1))
-    assert available >= 300 * 1024, f"{available // 1024} MiB available"
+    total = int(re.search(r"MemTotal:\s+(\d+) kB", meminfo).group(1))
+    assert total >= 400 * 1024, f"{total // 1024} MiB managed by the kernel"

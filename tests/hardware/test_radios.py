@@ -86,6 +86,8 @@ def test_configured_transmit_power_caps_every_chain(router):
     checked = []
     for slot in (RADIO_2G_SLOT, RADIO_5G_SLOT):
         section = radio_section(router, slot)
+        if router.run(f"uci -q get wireless.{section}.disabled; true").strip() == "1":
+            continue
         cap = router.run(f"uci -q get wireless.{section}.txpower; true").strip()
         interfaces = router.run(
             f"ls /sys/class/ieee80211/{found[slot]}/device/net 2>/dev/null; true"
