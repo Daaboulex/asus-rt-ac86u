@@ -1,0 +1,179 @@
+diff --git a/target/linux/bcm4908/config-6.18 b/target/linux/bcm4908/config-6.18
+index da84c3c..0b24cb7 100644
+--- a/target/linux/bcm4908/config-6.18
++++ b/target/linux/bcm4908/config-6.18
+@@ -145,6 +145,7 @@ CONFIG_HAS_DMA=y
+ CONFIG_HAS_IOMEM=y
+ CONFIG_HAS_IOPORT=y
+ CONFIG_HAS_IOPORT_MAP=y
++CONFIG_HWMON=y
+ CONFIG_HW_RANDOM=y
+ CONFIG_HW_RANDOM_IPROC_RNG200=y
+ CONFIG_HZ_PERIODIC=y
+@@ -271,6 +272,7 @@ CONFIG_RESET_SIMPLE=y
+ CONFIG_RFS_ACCEL=y
+ CONFIG_RPS=y
+ CONFIG_RWSEM_SPIN_ON_OWNER=y
++CONFIG_SENSORS_BCM4908_TEMP=y
+ # CONFIG_SERIAL_8250 is not set
+ CONFIG_SERIAL_BCM63XX=y
+ CONFIG_SERIAL_BCM63XX_CONSOLE=y
+diff --git a/target/linux/bcm4908/patches-6.18/104-hwmon-add-a-driver-for-the-bcm4908-cpu-temperature-sensor.patch b/target/linux/bcm4908/patches-6.18/104-hwmon-add-a-driver-for-the-bcm4908-cpu-temperature-sensor.patch
+new file mode 100644
+index 0000000..55ff734
+--- /dev/null
++++ b/target/linux/bcm4908/patches-6.18/104-hwmon-add-a-driver-for-the-bcm4908-cpu-temperature-sensor.patch
+@@ -0,0 +1,115 @@
++From: Daaboulex <39669593+Daaboulex@users.noreply.github.com>
++Subject: [PATCH] hwmon: add a driver for the BCM4908 CPU temperature sensor
++
++The CPU cluster of the BCM4908 family carries a temperature sensor
++whose 10-bit reading sits in the cluster's configuration block, at
++0x810621a0. Broadcom's GPL thermal driver in vendor firmware for these
++SoCs reads that register and converts the reading to millidegrees
++Celsius as (4133500 - 4906 * raw) / 10. Report it the same way through
++hwmon, so user space sees it under /sys/class/hwmon.
++
++---
++--- a/drivers/hwmon/Kconfig
+++++ b/drivers/hwmon/Kconfig
++@@ -458,6 +458,17 @@ config SENSORS_ATXP1
++ 	  This driver can also be built as a module. If so, the module
++ 	  will be called atxp1.
++ 
+++config SENSORS_BCM4908_TEMP
+++	tristate "Broadcom BCM4908 CPU temperature sensor"
+++	depends on ARCH_BCMBCA || COMPILE_TEST
+++	depends on HAS_IOMEM
+++	help
+++	  If you say yes here you get support for the temperature sensor
+++	  of the CPU cluster in Broadcom BCM4908 family SoCs.
+++
+++	  This driver can also be built as a module. If so, the module
+++	  will be called bcm4908-temp.
+++
++ config SENSORS_BT1_PVT
++ 	tristate "Baikal-T1 Process, Voltage, Temperature sensor driver"
++ 	depends on MIPS_BAIKAL_T1 || COMPILE_TEST
++--- a/drivers/hwmon/Makefile
+++++ b/drivers/hwmon/Makefile
++@@ -58,6 +58,7 @@ obj-$(CONFIG_SENSORS_ASPEED_G6) += aspeed-g6-pwm-tach.o
++ obj-$(CONFIG_SENSORS_ASUS_ROG_RYUJIN)	+= asus_rog_ryujin.o
++ obj-$(CONFIG_SENSORS_ATXP1)	+= atxp1.o
++ obj-$(CONFIG_SENSORS_AXI_FAN_CONTROL) += axi-fan-control.o
+++obj-$(CONFIG_SENSORS_BCM4908_TEMP)	+= bcm4908-temp.o
++ obj-$(CONFIG_SENSORS_BT1_PVT)	+= bt1-pvt.o
++ obj-$(CONFIG_SENSORS_CGBC)	+= cgbc-hwmon.o
++ obj-$(CONFIG_SENSORS_CHIPCAP2) += chipcap2.o
++--- /dev/null
+++++ b/drivers/hwmon/bcm4908-temp.c
++@@ -0,0 +1,71 @@
+++// SPDX-License-Identifier: GPL-2.0-only
+++
+++#include <linux/bitfield.h>
+++#include <linux/bits.h>
+++#include <linux/err.h>
+++#include <linux/hwmon.h>
+++#include <linux/io.h>
+++#include <linux/mod_devicetable.h>
+++#include <linux/module.h>
+++#include <linux/platform_device.h>
+++
+++#define BCM4908_TEMP_RAW		GENMASK(9, 0)
+++#define BCM4908_TEMP_OFFSET_DECI_MC	4133500
+++#define BCM4908_TEMP_SLOPE_DECI_MC	4906
+++
+++static int bcm4908_temp_read(struct device *dev, enum hwmon_sensor_types type,
+++			     u32 attr, int channel, long *val)
+++{
+++	void __iomem *reg = dev_get_drvdata(dev);
+++	long raw = FIELD_GET(BCM4908_TEMP_RAW, readl(reg));
+++
+++	*val = (BCM4908_TEMP_OFFSET_DECI_MC - BCM4908_TEMP_SLOPE_DECI_MC * raw) / 10;
+++	return 0;
+++}
+++
+++static const struct hwmon_channel_info * const bcm4908_temp_info[] = {
+++	HWMON_CHANNEL_INFO(temp, HWMON_T_INPUT),
+++	NULL
+++};
+++
+++static const struct hwmon_ops bcm4908_temp_ops = {
+++	.visible = 0444,
+++	.read = bcm4908_temp_read,
+++};
+++
+++static const struct hwmon_chip_info bcm4908_temp_chip_info = {
+++	.ops = &bcm4908_temp_ops,
+++	.info = bcm4908_temp_info,
+++};
+++
+++static int bcm4908_temp_probe(struct platform_device *pdev)
+++{
+++	struct device *hwmon;
+++	void __iomem *reg;
+++
+++	reg = devm_platform_ioremap_resource(pdev, 0);
+++	if (IS_ERR(reg))
+++		return PTR_ERR(reg);
+++
+++	hwmon = devm_hwmon_device_register_with_info(&pdev->dev, "bcm4908_cpu", reg,
+++						     &bcm4908_temp_chip_info, NULL);
+++	return PTR_ERR_OR_ZERO(hwmon);
+++}
+++
+++static const struct of_device_id bcm4908_temp_of_match[] = {
+++	{ .compatible = "brcm,bcm4908-cpu-temp" },
+++	{ }
+++};
+++MODULE_DEVICE_TABLE(of, bcm4908_temp_of_match);
+++
+++static struct platform_driver bcm4908_temp_driver = {
+++	.probe = bcm4908_temp_probe,
+++	.driver = {
+++		.name = "bcm4908-temp",
+++		.of_match_table = bcm4908_temp_of_match,
+++	},
+++};
+++module_platform_driver(bcm4908_temp_driver);
+++
+++MODULE_DESCRIPTION("Broadcom BCM4908 CPU temperature sensor");
+++MODULE_LICENSE("GPL");
+diff --git a/target/linux/bcm4908/patches-6.18/105-arm64-dts-broadcom-bcmbca-bcm4908-describe-the-cpu-temperature-sensor.patch b/target/linux/bcm4908/patches-6.18/105-arm64-dts-broadcom-bcmbca-bcm4908-describe-the-cpu-temperature-sensor.patch
+new file mode 100644
+index 0000000..fd9c30c
+--- /dev/null
++++ b/target/linux/bcm4908/patches-6.18/105-arm64-dts-broadcom-bcmbca-bcm4908-describe-the-cpu-temperature-sensor.patch
+@@ -0,0 +1,32 @@
++From: Daaboulex <39669593+Daaboulex@users.noreply.github.com>
++Subject: [PATCH] arm64: dts: broadcom: bcmbca: bcm4908: describe the CPU temperature sensor
++
++The temperature sensor of the CPU cluster sits in the cluster's
++configuration block at 0x81060000, beyond the window of the axi bus,
++which ends after the GIC. Widen the window to cover that block and
++describe the sensor's register.
++
++---
++--- a/arch/arm64/boot/dts/broadcom/bcmbca/bcm4908.dtsi
+++++ b/arch/arm64/boot/dts/broadcom/bcmbca/bcm4908.dtsi
++@@ -82,7 +82,7 @@
++ 		compatible = "simple-bus";
++ 		#address-cells = <1>;
++ 		#size-cells = <1>;
++-		ranges = <0x00 0x00 0x81000000 0x4000>;
+++		ranges = <0x00 0x00 0x81000000 0x64000>;
++ 
++ 		gic: interrupt-controller@1000 {
++ 			compatible = "arm,gic-400";
++@@ -92,6 +92,11 @@
++ 			reg = <0x1000 0x1000>,
++ 			      <0x2000 0x2000>;
++ 		};
+++
+++		temperature-sensor@621a0 {
+++			compatible = "brcm,bcm4908-cpu-temp";
+++			reg = <0x621a0 0x4>;
+++		};
++ 	};
++ 
++ 	timer {
