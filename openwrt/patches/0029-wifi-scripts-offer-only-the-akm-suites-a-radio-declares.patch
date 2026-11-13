@@ -1,0 +1,149 @@
+diff --git a/package/network/config/wifi-scripts/files-ucode/usr/share/ucode/wifi/ap.uc b/package/network/config/wifi-scripts/files-ucode/usr/share/ucode/wifi/ap.uc
+index 3afc200..3493845 100644
+--- a/package/network/config/wifi-scripts/files-ucode/usr/share/ucode/wifi/ap.uc
++++ b/package/network/config/wifi-scripts/files-ucode/usr/share/ucode/wifi/ap.uc
+@@ -54,10 +54,13 @@ function sae_password_available(config) {
+ 		sae_password_option(config);
+ }
+ 
+-function bss_refusal(config, band) {
++function bss_refusal(config, band, phy_features) {
+ 	const personal = config.auth_type in [ 'psk', 'psk2', 'sae', 'psk-sae', 'psk-sae-compat' ];
+ 	const kind = key_kind(config.key);
+ 
++	if (!iface.ap_auth_type_offered(config.auth_type, phy_features?.ap_akm_suites))
++		return 'AKM_NOT_SUPPORTED';
++
+ 	if (personal && !config.ppsk && kind == 'invalid')
+ 		return 'INVALID_WPA_PSK';
+ 
+@@ -125,7 +128,7 @@ function mld_rsno2(link_config, dev_config, phy_features) {
+ /* a refusal on any band refuses every link of the AP MLD */
+ function mld_refusal(link_config, dev_config, phy_features, rsno2) {
+ 	for (let link in mld_links(link_config, dev_config, phy_features, rsno2)) {
+-		const reason = bss_refusal(link.config, link.band);
++		const reason = bss_refusal(link.config, link.band, phy_features);
+ 		if (reason)
+ 			return reason;
+ 	}
+@@ -731,7 +734,7 @@ export function generate(interface, data, config, vlans, stas, phy_features) {
+ 	iface.parse_encryption(config, data.config, phy_features, rsno2);
+ 
+ 	const refusal = mld ?
+-		mld_refusal(link_config, data.config, phy_features, rsno2) : bss_refusal(config, data.config.band);
++		mld_refusal(link_config, data.config, phy_features, rsno2) : bss_refusal(config, data.config.band, phy_features);
+ 	if (refusal)
+ 		return refusal;
+ 
+@@ -772,7 +775,7 @@ export function generate(interface, data, config, vlans, stas, phy_features) {
+ 
+ 	iface_interworking(config);
+ 
+-	iface.wpa_key_mgmt(config, data.config.band);
++	iface.wpa_key_mgmt(config, data.config.band, phy_features.ap_akm_suites);
+ 	append_vars(config, [
+ 		'wpa_key_mgmt',
+ 	]);
+diff --git a/package/network/config/wifi-scripts/files-ucode/usr/share/ucode/wifi/hostapd.uc b/package/network/config/wifi-scripts/files-ucode/usr/share/ucode/wifi/hostapd.uc
+index 7da6d22..7e3d841 100644
+--- a/package/network/config/wifi-scripts/files-ucode/usr/share/ucode/wifi/hostapd.uc
++++ b/package/network/config/wifi-scripts/files-ucode/usr/share/ucode/wifi/hostapd.uc
+@@ -503,6 +503,7 @@ function device_capabilities(config) {
+ 	phy_features.ftm_responder = device_extended_features(phy.extended_features, NL80211_EXT_FEATURE_ENABLE_FTM_RESPONDER);
+ 	phy_features.radar_background = device_extended_features(phy.extended_features, NL80211_EXT_FEATURE_RADAR_BACKGROUND);
+ 	phy_features.cipher_gcmp256 = iface.phy_cipher_gcmp256(phy);
++	phy_features.ap_akm_suites = iface.phy_ap_akm_suites(phy);
+ }
+ 
+ function generate(config) {
+diff --git a/package/network/config/wifi-scripts/files-ucode/usr/share/ucode/wifi/iface.uc b/package/network/config/wifi-scripts/files-ucode/usr/share/ucode/wifi/iface.uc
+index b9291f3..71b5287 100644
+--- a/package/network/config/wifi-scripts/files-ucode/usr/share/ucode/wifi/iface.uc
++++ b/package/network/config/wifi-scripts/files-ucode/usr/share/ucode/wifi/iface.uc
+@@ -4,11 +4,45 @@ import { append_value, log } from 'wifi.common';
+ import * as fs from 'fs';
+ 
+ const WLAN_CIPHER_SUITE_GCMP_256 = 0x000fac09;
++const WLAN_AKM_SUITE_8021X_SHA256 = 0x000fac05;
++const WLAN_AKM_SUITE_PSK_SHA256 = 0x000fac06;
++const WLAN_AKM_SUITE_SAE = 0x000fac08;
++const WLAN_AKM_SUITE_8021X_SUITE_B_192 = 0x000fac0c;
++const WLAN_AKM_SUITE_OWE = 0x000fac12;
++
++const auth_type_akm = {
++	'sae': WLAN_AKM_SUITE_SAE,
++	'psk-sae': WLAN_AKM_SUITE_SAE,
++	'psk-sae-compat': WLAN_AKM_SUITE_SAE,
++	'eap2': WLAN_AKM_SUITE_8021X_SHA256,
++	'eap-eap2': WLAN_AKM_SUITE_8021X_SHA256,
++	'eap192': WLAN_AKM_SUITE_8021X_SUITE_B_192,
++	'owe': WLAN_AKM_SUITE_OWE,
++};
+ 
+ export function phy_cipher_gcmp256(phy) {
+ 	return WLAN_CIPHER_SUITE_GCMP_256 in (phy?.cipher_suites ?? []);
+ };
+ 
++export function phy_ap_akm_suites(phy) {
++	let suites = null;
++
++	for (let entry in phy?.iftype_akm_suites ?? [])
++		if (entry?.iftypes?.ap)
++			suites = [ ...(suites ?? []), ...(entry.akm_suites ?? []) ];
++
++	return suites;
++};
++
++function akm_offered(ap_akm_suites, suite) {
++	return ap_akm_suites == null || suite in ap_akm_suites;
++}
++
++export function ap_auth_type_offered(auth_type, ap_akm_suites) {
++	const suite = auth_type_akm[auth_type];
++	return suite == null || akm_offered(ap_akm_suites, suite);
++};
++
+ /*
+  * The 6 GHz band allows WPA3 and OWE only (IEEE 802.11-2024 12.12.2,
+  * WPA3 Specification v3.5 11.2).
+@@ -233,17 +267,20 @@ export function parse_encryption(config, dev_config, phy_features, rsno2) {
+ 		config.rsn_override_pairwise_2 = rsno2_pairwise;
+ };
+ 
+-export function wpa_key_mgmt(config, band) {
++export function wpa_key_mgmt(config, band, ap_akm_suites) {
+ 	if (!config.wpa)
+ 		return;
+ 
++	const psk_sha256 = config.ieee80211w && akm_offered(ap_akm_suites, WLAN_AKM_SUITE_PSK_SHA256);
++	const eap_sha256 = config.ieee80211w && akm_offered(ap_akm_suites, WLAN_AKM_SUITE_8021X_SHA256);
++
+ 	switch(config.auth_type) {
+ 	case 'psk':
+ 	case 'psk2':
+ 		append_value(config, 'wpa_key_mgmt', 'WPA-PSK');
+ 		if (config.wpa >= 2 && config.ieee80211r)
+ 			append_value(config, 'wpa_key_mgmt', 'FT-PSK');
+-		if (config.ieee80211w)
++		if (psk_sha256)
+ 			append_value(config, 'wpa_key_mgmt', 'WPA-PSK-SHA256');
+ 		break;
+ 
+@@ -251,7 +288,7 @@ export function wpa_key_mgmt(config, band) {
+ 		append_value(config, 'wpa_key_mgmt', 'WPA-EAP');
+ 		if (config.wpa >= 2 && config.ieee80211r)
+ 			append_value(config, 'wpa_key_mgmt', 'FT-EAP');
+-		if (config.ieee80211w)
++		if (eap_sha256)
+ 			append_value(config, 'wpa_key_mgmt', 'WPA-EAP-SHA256');
+ 		break;
+ 
+@@ -297,7 +334,7 @@ export function wpa_key_mgmt(config, band) {
+ 		}
+ 
+ 		append_value(config, 'wpa_key_mgmt', 'WPA-PSK');
+-		if (config.ieee80211w)
++		if (psk_sha256)
+ 			append_value(config, 'wpa_key_mgmt', 'WPA-PSK-SHA256');
+ 		if (config.ieee80211r)
+ 			append_value(config, 'wpa_key_mgmt', 'FT-PSK');
