@@ -1,0 +1,38 @@
+diff --git a/target/linux/bcm4908/patches-6.18/103-serial-bcm63xx-keep-the-console-transmitting-after-shutdown.patch b/target/linux/bcm4908/patches-6.18/103-serial-bcm63xx-keep-the-console-transmitting-after-shutdown.patch
+new file mode 100644
+index 0000000..144bcc1
+--- /dev/null
++++ b/target/linux/bcm4908/patches-6.18/103-serial-bcm63xx-keep-the-console-transmitting-after-shutdown.patch
+@@ -0,0 +1,32 @@
++From: Daaboulex <39669593+Daaboulex@users.noreply.github.com>
++Subject: [PATCH] serial: bcm63xx: keep the console transmitting after shutdown
++
++bcm_uart_shutdown() clears BRGEN, TXEN and RXEN and resets both FIFOs,
++also on the port that carries the kernel console. When the console tty
++is hung up, as when init kills the login on it at reboot, the console
++keeps writing through bcm_console_putchar(), whose wait_for_xmitr()
++then runs into its 10 ms timeout on every character while the port
++lock is held with interrupts off. Each kernel message then holds a CPU
++for about a second, and on the BCM4908 the NAND controller timed out
++and reads and writes failed during reboot.
++
++Leave the console port transmitting: mask its interrupts and free the
++irq as before, but keep the baud generator, the transmitter and the
++FIFOs as they are.
++
++---
++--- a/drivers/tty/serial/bcm63xx_uart.c
+++++ b/drivers/tty/serial/bcm63xx_uart.c
++@@ -457,8 +457,10 @@ static void bcm_uart_shutdown(struct uar
++ 	bcm_uart_writel(port, 0, UART_IR_REG);
++ 	uart_port_unlock_irqrestore(port, flags);
++ 
++-	bcm_uart_disable(port);
++-	bcm_uart_flush(port);
+++	if (!uart_console(port)) {
+++		bcm_uart_disable(port);
+++		bcm_uart_flush(port);
+++	}
++ 	free_irq(port->irq, port);
++ }
++ 
