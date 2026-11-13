@@ -3,7 +3,7 @@ new file mode 100644
 index 0000000..ee5144b
 --- /dev/null
 +++ b/target/linux/bcm4908/patches-6.18/102-net-dsa-bcm_sf2-let-the-bcm4908-switch-settle-after-reset.patch
-@@ -0,0 +1,25 @@
+@@ -0,0 +1,37 @@
 +From: Daaboulex <39669593+Daaboulex@users.noreply.github.com>
 +Subject: [PATCH] net: dsa: bcm_sf2: let the bcm4908 switch settle after reset
 +
@@ -14,17 +14,29 @@ index 0000000..ee5144b
 +as the core block reports SOFTWARE_RESET clear.
 +
 +Sleep 20 ms after that reset on the BCM4908 before any register is
-+touched.
++touched. Over 90 warm resets of an RT-AC86U, 8 aborted this way without
++the delay and none with it. Why the block faults after SOFTWARE_RESET
++reads clear is not known, and 20 ms is the measured value, not a
++documented ready condition.
 +
 +---
 +--- a/drivers/net/dsa/bcm_sf2.c
 ++++ b/drivers/net/dsa/bcm_sf2.c
-+@@ -502,6 +502,9 @@ static int bcm_sf2_sw_rst(struct bcm_sf2_priv *priv)
++@@ -470,6 +470,8 @@ static irqreturn_t bcm_sf2_switch_1_isr(int irq, void *dev_id)
++ 	return IRQ_HANDLED;
++ }
++ 
+++#define BCM4908_SW_RST_SETTLE_MS	20
+++
++ static int bcm_sf2_sw_rst(struct bcm_sf2_priv *priv)
++ {
++ 	unsigned int timeout = 1000;
++@@ -502,6 +504,9 @@ static int bcm_sf2_sw_rst(struct bcm_sf2_priv *priv)
 + 	if (timeout == 0)
 + 		return -ETIMEDOUT;
 + 
 ++	if (priv->type == BCM4908_DEVICE_ID)
-++		msleep(20);
+++		msleep(BCM4908_SW_RST_SETTLE_MS);
 ++
 + 	return 0;
 + }
