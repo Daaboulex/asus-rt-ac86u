@@ -144,7 +144,7 @@ the line says so.
   `815-thermal-broadcom-add-a-bcm4908-thermal-sensor-driver` reports it
   the same way, as the thermal zone `cpu-thermal`, also shown in hwmon as
   `cpu_thermal`, which LuCI's dashboard files under CPU. On 2026-11-13 it
-  read 66.0 C idle, 69.4 C after 10 s and 71.4 C after 60 s on all four
+  read 66.0 C idle, 69.4 C after 10 s and 71.4 C after 60 s on both
   cores, and 66.0 C again a minute later
   (`test_cpu_temperature_rises_under_load`). The radios report no
   temperature.
