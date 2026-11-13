@@ -59,9 +59,17 @@ def test_a_panic_reboots_and_leaves_a_record(router):
 @pytest.mark.destructive
 def test_reboots_come_back(router):
     count = int(os.environ.get("ROUTER_REBOOTS", "5"))
-    for _ in range(count):
+    kept = set(router.run("ls /sys/fs/pstore").split())
+    for boot in range(1, count + 1):
         old = router.boot_id()
         router.ssh("(sleep 1; reboot) > /dev/null 2>&1 &")
         router.wait_for_new_boot(old, limit=300)
         log = router.dmesg()
         assert len(re.findall(r"brcmf_c_preinit_dcmds: Firmware", log)) == 2
+        crashed = sorted(set(router.run("ls /sys/fs/pstore").split()) - kept)
+        where = (
+            router.run(f"cd /sys/fs/pstore && grep -ah -m 1 'pc : ' {' '.join(crashed)}; true")
+            if crashed
+            else ""
+        )
+        assert not crashed, f"boot {boot} crashed on the way up, left {crashed}: {where.strip()}"
