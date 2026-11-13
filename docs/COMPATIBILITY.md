@@ -61,6 +61,19 @@ the line says so.
   fails the suite the day it passes.
 - Routing runs on the CPU: OpenWrt has no hardware NAT offload for this SoC.
   No test in this repository measures throughput.
+- A device that moves from behind a switch port to the router's Wi-Fi
+  stays unreachable through that port for minutes. The `b53` and
+  `bcm_sf2` drivers do not set `assisted_learning_on_cpu_port` (Linux
+  6.18.60, and mainline in 2026-11), so the switch chip never learns that
+  a Wi-Fi client sits behind the CPU and keeps the port it last saw the
+  client on. On 2026-11-13, with LAN1 cabled into the upstream router's
+  network and the router's own DHCP off, a client moved from that
+  network's Wi-Fi to this router's got no DHCP answer for about ten
+  minutes: the upstream offer came in on LAN1, `bridge fdb show` still
+  listed the client on LAN1 as `self`, and the offer never reached the
+  CPU. A LAN port bridged into another network invites this; a router
+  that serves its own DHCP meets it only when a device moves from one of
+  its LAN ports to its Wi-Fi.
 - USB 3 storage reads slowly: an NVMe drive in an RTL9210 enclosure,
   linked at 5 Gbit/s under `uas`, read 35 to 44 MB/s with `dd` from the
   start of the drive, direct or cached, with the busy core waiting on
@@ -137,6 +150,13 @@ radios capped at 9 dBm per chain.
   (`flow_offloading` 1) changed neither the rate nor the load, so it
   stays off. No wired client has measured routing above the internet
   line yet.
+- Routing and DNS through the router from a Wi-Fi 7 client on 5 GHz at
+  -46 dBm with a 780 Mbit/s link, its Wi-Fi power save off (2026-11-13):
+  a 100 MB download through NAT ran at the internet line's full rate, as
+  on a cable that bypasses the router, and a ping to 1.1.1.1 averaged
+  16.7 ms against 15.6 ms on that cable. With the client's power save
+  on, the same ping averaged 44 ms. `iperf3 -P 4` against the router
+  reached 409 Mbit/s from the client and 581 Mbit/s to it.
 - WireGuard on the two cores, with both ends of the tunnel on the router
   (2026-11-13): two `wireguard` interfaces made in the main namespace,
   so their UDP sockets stay there on loopback, were moved into two
