@@ -69,8 +69,10 @@ the line says so.
   differ by a byte, which phones report as a wrong password. A handshake
   trace on 2026-11-13 showed two differences. hostapd left out the
   BIP-CMAC-128 management cipher field the firmware always writes, which
-  hostapd patch `990-AP-write-the-default-management-group-cipher-into-the-RSNE`
-  now writes. Given PSK and PSK-SHA256 with PMF, the firmware advertises
+  hostapd patch
+  `056-AP-write-the-default-management-group-cipher-when-the-driver-does-AP-MLME`
+  now writes for drivers that do the AP MLME themselves. Given PSK and
+  PSK-SHA256 with PMF, the firmware advertises
   only PSK-SHA256, so brcmfmac patch
   `885-wifi-brcmfmac-report-the-AKM-suites-an-access-point-offers`
   declares the AKMs the firmware advertises as given and the wifi scripts

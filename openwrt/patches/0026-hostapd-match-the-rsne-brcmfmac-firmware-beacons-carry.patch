@@ -1,37 +1,50 @@
-diff --git a/package/network/services/hostapd/patches/990-AP-write-the-default-management-group-cipher-into-the-RSNE.patch b/package/network/services/hostapd/patches/990-AP-write-the-default-management-group-cipher-into-the-RSNE.patch
+diff --git a/package/network/services/hostapd/patches/056-AP-write-the-default-management-group-cipher-when-the-driver-does-AP-MLME.patch b/package/network/services/hostapd/patches/056-AP-write-the-default-management-group-cipher-when-the-driver-does-AP-MLME.patch
 new file mode 100644
 index 0000000..f33fde8
 --- /dev/null
-+++ b/package/network/services/hostapd/patches/990-AP-write-the-default-management-group-cipher-into-the-RSNE.patch
-@@ -0,0 +1,37 @@
++++ b/package/network/services/hostapd/patches/056-AP-write-the-default-management-group-cipher-when-the-driver-does-AP-MLME.patch
+@@ -0,0 +1,96 @@
 +From: Daaboulex <39669593+Daaboulex@users.noreply.github.com>
-+Subject: [PATCH] AP: write the default management group cipher into the RSNE
++Subject: [PATCH] AP: write the default management group cipher when the driver does AP MLME
 +
-+With management frame protection enabled, wpa_write_rsn_ie() leaves
++With management frame protection enabled, rsne_write_data() leaves
 +out the PMKID Count and the Management Group Cipher Suite when the
 +cipher is the default BIP-CMAC-128. Broadcom FullMAC firmware driven
-+by brcmfmac builds the beacon and probe response RSNE itself and
-+always writes that field, so the RSNE hostapd sends in message 3 of
-+the 4-way handshake differs from the one in the beacon, and stations
-+abort with reason 17 (IE in 4-way handshake differs).
++by brcmfmac, which does the AP MLME itself, builds the beacon and probe
++response RSNE on its own and always writes that field, so the RSNE
++hostapd sends in message 3 of the 4-way handshake differs from the one
++in the beacon, and stations abort with reason 17 (IE in 4-way handshake
++differs).
 +
-+Write the field for BIP-CMAC-128 as well. The element stays valid:
-+the field is optional for the default cipher, not forbidden.
++Write the field for BIP-CMAC-128 as well in the AP's own RSNE when the
++driver does not leave the AP MLME to hostapd (no
++WPA_DRIVER_FLAGS_AP_MLME). Drivers whose beacons hostapd builds keep
++the RSNE they have now. The element stays valid: the field is optional
++for the default cipher, not forbidden.
 +
 +---
 +--- a/src/ap/wpa_auth_ie.c
 ++++ b/src/ap/wpa_auth_ie.c
-+@@ -341,8 +341,7 @@ static u8 * rsne_write_data(u8 *buf, size_t len, u8 *pos, int group,
-+ 	}
++@@ -123,7 +123,7 @@ static u16 wpa_own_rsn_capab(struct wpa_auth_config *conf,
++ static u8 * rsne_write_data(u8 *buf, size_t len, u8 *pos, int group,
++ 			    int pairwise, int key_mgmt, u16 rsn_capab,
++ 			    const u8 *pmkid, enum mfp_options mfp,
++-			    int group_mgmt_cipher)
+++			    int group_mgmt_cipher, bool mgmt_cipher_explicit)
++ {
++ 	int num_suites, res;
++ 	u8 *count;
++@@ -342,7 +342,8 @@ static u8 * rsne_write_data(u8 *buf, size_t len, u8 *pos, int group,
 + 
 + 
-+-	if (mfp != NO_MGMT_FRAME_PROTECTION &&
++ 	if (mfp != NO_MGMT_FRAME_PROTECTION &&
 +-	    group_mgmt_cipher != WPA_CIPHER_AES_128_CMAC) {
-++	if (mfp != NO_MGMT_FRAME_PROTECTION) {
+++	    (mgmt_cipher_explicit ||
+++	     group_mgmt_cipher != WPA_CIPHER_AES_128_CMAC)) {
 + 		if (2 + 4 > buf + len - pos)
 + 			return NULL;
 + 		if (!pmkid) {
-+@@ -353,6 +352,9 @@ static u8 * rsne_write_data(u8 *buf, size_t len, u8 *pos, int group,
++@@ -353,6 +354,9 @@ static u8 * rsne_write_data(u8 *buf, size_t len, u8 *pos, int group,
 + 
 + 		/* Management Group Cipher Suite */
 + 		switch (group_mgmt_cipher) {
@@ -41,3 +54,49 @@ index 0000000..f33fde8
 + 		case WPA_CIPHER_BIP_GMAC_128:
 + 			RSN_SELECTOR_PUT(pos, RSN_CIPHER_SUITE_BIP_GMAC_128);
 + 			break;
++@@ -411,7 +415,8 @@ int wpa_write_rsn_ie(struct wpa_auth_config *conf, u8 *buf, size_t len,
++ 	pos = rsne_write_data(buf, len, pos, conf->wpa_group,
++ 			      conf->rsn_pairwise, conf->wpa_key_mgmt,
++ 			      wpa_own_rsn_capab(conf, conf->ieee80211w), pmkid,
++-			      conf->ieee80211w, conf->group_mgmt_cipher);
+++			      conf->ieee80211w, conf->group_mgmt_cipher,
+++			      !conf->ap_mlme);
++ 	if (!pos)
++ 		return -1;
++ 
++@@ -441,7 +446,7 @@ static int wpa_write_rsne_override(struct wpa_auth_config *conf, u8 *buf,
++ 			      conf->rsn_override_key_mgmt,
++ 			      wpa_own_rsn_capab(conf, conf->rsn_override_mfp),
++ 			      NULL, conf->rsn_override_mfp,
++-			      conf->group_mgmt_cipher);
+++			      conf->group_mgmt_cipher, false);
++ 	if (!pos)
++ 		return -1;
++ 
++@@ -471,7 +476,7 @@ static int wpa_write_rsne_override_2(struct wpa_auth_config *conf, u8 *buf,
++ 			      conf->rsn_override_key_mgmt_2,
++ 			      wpa_own_rsn_capab(conf, conf->rsn_override_mfp_2),
++ 			      NULL, conf->rsn_override_mfp_2,
++-			      conf->group_mgmt_cipher);
+++			      conf->group_mgmt_cipher, false);
++ 	if (!pos)
++ 		return -1;
++ 
++@@ -499,7 +504,7 @@ int wpa_write_802_1x_rsne(struct wpa_authenticator *wpa_auth, u8 *buf,
++ 	pos = rsne_write_data(buf, len, pos, group_cipher,
++ 			      pairwise_cipher, akmp,
++ 			      wpa_own_rsn_capab(conf, conf->ieee80211w),
++-			      pmkid, mfp, group_mgmt_cipher);
+++			      pmkid, mfp, group_mgmt_cipher, false);
++ 	if (!pos)
++ 		return -1;
++ 
++@@ -535,7 +540,7 @@ int wpa_write_eppke_rsne(const u8 *wpa_ie, size_t wpa_ie_len,
++ 	}
++ 	pos = rsne_write_data(buf, len, pos, data.group_cipher, pairwise_cipher,
++ 			      akmp, data.capabilities, pmkid, mfp,
++-			      data.mgmt_group_cipher);
+++			      data.mgmt_group_cipher, false);
++ 	if (!pos)
++ 		return -1;
++ 
