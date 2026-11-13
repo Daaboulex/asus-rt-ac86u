@@ -1,18 +1,8 @@
 diff --git a/target/linux/bcm4908/config-6.18 b/target/linux/bcm4908/config-6.18
-index d4eae29..e41f5e3 100644
+index d4eae29..afe0a6a 100644
 --- a/target/linux/bcm4908/config-6.18
 +++ b/target/linux/bcm4908/config-6.18
-@@ -49,6 +49,9 @@ CONFIG_BCM_NET_PHYLIB=y
- CONFIG_BCM_PMB=y
- # CONFIG_BLK_DEV_INITRD is not set
- CONFIG_BLK_PM=y
-+CONFIG_BOOTPARAM_HARDLOCKUP_PANIC=y
-+CONFIG_BOOTPARAM_HUNG_TASK_PANIC=y
-+CONFIG_BOOTPARAM_SOFTLOCKUP_PANIC=y
- CONFIG_BUILTIN_RETURN_ADDRESS_STRIPS_PAC=y
- CONFIG_CC_HAVE_SHADOW_CALL_STACK=y
- CONFIG_CC_HAVE_STACKPROTECTOR_SYSREG=y
-@@ -136,6 +139,8 @@ CONFIG_GPIO_GENERIC=y
+@@ -136,6 +136,8 @@ CONFIG_GPIO_GENERIC=y
  CONFIG_GPIO_GENERIC_PLATFORM=y
  CONFIG_GRO_CELLS=y
  CONFIG_HARDIRQS_SW_RESEND=y
@@ -21,7 +11,7 @@ index d4eae29..e41f5e3 100644
  CONFIG_HAS_DMA=y
  CONFIG_HAS_IOMEM=y
  CONFIG_HAS_IOPORT=y
-@@ -158,6 +163,7 @@ CONFIG_JFFS2_ZLIB=y
+@@ -158,6 +160,7 @@ CONFIG_JFFS2_ZLIB=y
  CONFIG_LEDS_BCM63138=y
  CONFIG_LEDS_GPIO=y
  CONFIG_LIBFDT=y
@@ -29,7 +19,7 @@ index d4eae29..e41f5e3 100644
  CONFIG_LOCK_DEBUGGING_SUPPORT=y
  CONFIG_LOCK_SPIN_ON_OWNER=y
  CONFIG_LRU_GEN_WALKS_MMU=y
-@@ -179,6 +185,7 @@ CONFIG_MTD_NAND_ECC=y
+@@ -179,6 +182,7 @@ CONFIG_MTD_NAND_ECC=y
  CONFIG_MTD_NAND_ECC_SW_HAMMING=y
  CONFIG_MTD_OF_PARTS_BCM4908=y
  # CONFIG_MTD_OF_PARTS_LINKSYS_NS is not set
@@ -37,36 +27,48 @@ index d4eae29..e41f5e3 100644
  CONFIG_MTD_RAW_NAND=y
  CONFIG_MTD_SPLIT_CFE_BOOTFS=y
  # CONFIG_MTD_SPLIT_SQUASHFS_ROOT is not set
-@@ -245,6 +252,12 @@ CONFIG_POSIX_CPU_TIMERS_TASK_WORK=y
+@@ -245,6 +249,12 @@ CONFIG_POSIX_CPU_TIMERS_TASK_WORK=y
  CONFIG_POWER_RESET=y
  CONFIG_POWER_RESET_SYSCON=y
  CONFIG_POWER_SUPPLY=y
 +CONFIG_PSTORE=y
 +CONFIG_PSTORE_BLK=y
-+CONFIG_PSTORE_BLK_BLKDEV="misc3"
++CONFIG_PSTORE_BLK_BLKDEV=""
 +CONFIG_PSTORE_BLK_KMSG_SIZE=64
 +CONFIG_PSTORE_BLK_MAX_REASON=2
 +CONFIG_PSTORE_ZONE=y
  CONFIG_PTP_1588_CLOCK_OPTIONAL=y
  CONFIG_QUEUED_RWLOCKS=y
  CONFIG_QUEUED_SPINLOCKS=y
-diff --git a/target/linux/bcm4908/patches-6.18/316-arm64-dts-broadcom-bcmbca-rt-ac86u-free-misc3-for-crash-records.patch b/target/linux/bcm4908/patches-6.18/316-arm64-dts-broadcom-bcmbca-rt-ac86u-free-misc3-for-crash-records.patch
+diff --git a/target/linux/bcm4908/patches-6.18/316-arm64-dts-broadcom-bcmbca-rt-ac86u-keep-crash-records-in-misc3.patch b/target/linux/bcm4908/patches-6.18/316-arm64-dts-broadcom-bcmbca-rt-ac86u-keep-crash-records-in-misc3.patch
 new file mode 100644
-index 0000000..0aba5f2
+index 0000000..ee78b28
 --- /dev/null
-+++ b/target/linux/bcm4908/patches-6.18/316-arm64-dts-broadcom-bcmbca-rt-ac86u-free-misc3-for-crash-records.patch
-@@ -0,0 +1,18 @@
++++ b/target/linux/bcm4908/patches-6.18/316-arm64-dts-broadcom-bcmbca-rt-ac86u-keep-crash-records-in-misc3.patch
+@@ -0,0 +1,30 @@
 +From: Daaboulex <39669593+Daaboulex@users.noreply.github.com>
-+Subject: [PATCH] arm64: dts: broadcom: bcmbca: rt-ac86u: free misc3 for crash records
++Subject: [PATCH] arm64: dts: broadcom: bcmbca: rt-ac86u: keep crash records in misc3
 +
 +misc3 is a 1 MiB partition the vendor firmware used and OpenWrt does
-+not. Make it writable so mtdpstore can keep the last panic records
-+there: the unit's RAM does not survive a reset, so a RAM log cannot.
++not. Make it writable and name it to mtdpstore on the board's command
++line, so the kernel keeps its last panic records there: the unit's RAM
++does not survive a reset, so a RAM log cannot. The same line makes a
++soft lockup, a hard lockup and a hung task panic, so the watchdog
++reboots the unit and the panic leaves a record.
 +
 +---
 +--- a/arch/arm64/boot/dts/broadcom/bcmbca/bcm4906-asus-rt-ac86u.dts
 ++++ b/arch/arm64/boot/dts/broadcom/bcmbca/bcm4906-asus-rt-ac86u.dts
-+@@ -239,7 +239,6 @@
++@@ -18,7 +18,7 @@
++ 	};
++ 
++ 	chosen {
++-		bootargs = "earlycon=bcm63xx_uart,0xff800640 console=ttyS0,115200 swiotlb=noforce";
+++		bootargs = "earlycon=bcm63xx_uart,0xff800640 console=ttyS0,115200 swiotlb=noforce pstore_blk.blkdev=misc3 softlockup_panic=1 nmi_watchdog=panic sysctl.kernel.hung_task_panic=1";
++ 	};
++ 
++ 	memory@0 {
++@@ -243,7 +243,6 @@
 + 		partition@f600000 {
 + 			label = "misc3";
 + 			reg = <0xf600000 0x100000>;
