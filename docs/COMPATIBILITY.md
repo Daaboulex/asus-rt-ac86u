@@ -68,9 +68,10 @@ the line says so.
   patch 889 its beacons carried the element hostapd built; but on it SAE
   itself failed for both methods on 2026-11-13, so it is not used. Beacon
   protection (BIGTK) and Transition Disable are in no 4366c0 firmware
-  found. An Apple laptop under Asahi Linux (BCM4387) failed SAE against
-  this access point and against a Vodafone EasyBox alike; its firmware's
-  SAE offload under wpa_supplicant is a known Asahi limit.
+  found. A client that runs SAE in its own firmware (BCM4387 under Asahi
+  Linux with wpa_supplicant) failed SAE against this access point and
+  against an ISP router offering WPA3 alike, a known limit of that
+  client, so it cannot test WPA3 here.
 - Protected management frames (802.11w) work, optional, on every network.
   The firmware builds the RSN element of beacons and probe responses
   itself from what brcmfmac passes, hostapd sends its own in message 3 of
