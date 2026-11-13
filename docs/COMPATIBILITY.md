@@ -129,7 +129,7 @@ radios capped at 9 dBm per chain.
   channel and picked the least busy, which matched eight scans of
   `iw dev <ap> survey dump`. The survey carries no noise floor for
   channels 12 and 13, which ACS then skips.
-- Upload lag behind a DSL modem: two parallel `curl` uploads from the
+- Upload lag behind an upstream modem: two parallel `curl` uploads from the
   router saturating the line raised the ping to 1.1.1.1 from about 15 ms
   to 5 s on average and 14 s at worst. Cake from `sqm-scripts` on `wan`,
   shaping the upload at about 90 % of the measured line rate with

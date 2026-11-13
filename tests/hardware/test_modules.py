@@ -12,7 +12,7 @@ def test_wireguard_interface_can_be_created(router):
 def test_cake_shapes_an_interface(router):
     try:
         router.run("ip link add hwtest-ifb type ifb")
-        router.run("tc qdisc replace dev hwtest-ifb root cake bandwidth 40mbit")
+        router.run("tc qdisc replace dev hwtest-ifb root cake bandwidth 100mbit")
         assert "qdisc cake" in router.run("tc qdisc show dev hwtest-ifb")
     finally:
         router.run("ip link del hwtest-ifb 2>/dev/null; true")
