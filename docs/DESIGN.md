@@ -116,6 +116,17 @@ in the package build; the tests in `tests/hardware` run against a router.
   BCM4908: with it, 90 warm resets of the same kinds left no crash record,
   while each of the 30 deliberate panics among them left its own
   (2026-11-13). Cold boots have not been counted with it.
+- A plain `reboot` took about 50 s from the command to the next kernel,
+  against about 6 s for a watchdog reset (2026-11-13). At shutdown procd
+  points its stdio at `/dev/ttyS0` instead of `/dev/console` and kills
+  the console login; the hangup runs `bcm_uart_shutdown()`, which turns
+  the console UART's transmitter off, and every console character then
+  waits out the 10 ms timeout in `wait_for_xmitr()` with interrupts off.
+  One shutdown traced that way logged NAND command timeouts, squashfs
+  read errors and a failed UBI write before a soft lockup panic. Patch
+  0024 keeps the console port transmitting: with it a `reboot` reached
+  the next kernel 16 s after the command, and five reboots in a row came
+  back with no crash record.
 - Stock CFE RAM stage: `cferam.005`, 361932 bytes, image version HND3221458,
   SHA256 6427360d...4b12. It differs from the GT-AC5300 one in
   `bcm63xx-cfe` (355110 bytes).
