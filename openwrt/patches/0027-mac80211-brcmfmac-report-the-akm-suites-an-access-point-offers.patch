@@ -1,0 +1,74 @@
+diff --git a/package/kernel/mac80211/patches/brcm/885-wifi-brcmfmac-report-the-AKM-suites-an-access-point-offers.patch b/package/kernel/mac80211/patches/brcm/885-wifi-brcmfmac-report-the-AKM-suites-an-access-point-offers.patch
+new file mode 100644
+index 0000000..d335322
+--- /dev/null
++++ b/package/kernel/mac80211/patches/brcm/885-wifi-brcmfmac-report-the-AKM-suites-an-access-point-offers.patch
+@@ -0,0 +1,68 @@
++From: Daaboulex <39669593+Daaboulex@users.noreply.github.com>
++Subject: [PATCH] wifi: brcmfmac: report the AKM suites an access point offers
++
++In access point mode the firmware builds the RSNE of beacons and probe
++responses itself, from the wpa_auth bits brcmf_configure_wpaie() sets,
++while hostapd sends its own RSNE in message 3 of the 4-way handshake.
++Stations compare the two and abort with reason 17 when they differ.
++BCM4366 firmware 10.28.2 given WPA2_AUTH_PSK | WPA2_AUTH_PSK_SHA256
++with MFP capable advertises only the PSK-SHA256 AKM, so the WPA-PSK
++WPA-PSK-SHA256 pair hostapd uses with PMF never matches, and SAE never
++reaches the beacon without the firmware's SAE offload.
++
++Report the AKMs the firmware advertises as given through the per
++interface type AKM list: PSK and 802.1X, and SAE when the firmware
++offloads it. User space can then build an RSNE that matches.
++
++---
++--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.c
+++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.c
++@@ -250,6 +250,33 @@ static const u32 brcmf_cipher_suites[] = {
++ 	WLAN_CIPHER_SUITE_AES_CMAC
++ };
++ 
+++static const u32 brcmf_ap_akm_suites[] = {
+++	WLAN_AKM_SUITE_PSK,
+++	WLAN_AKM_SUITE_8021X,
+++};
+++
+++static const u32 brcmf_ap_akm_suites_sae[] = {
+++	WLAN_AKM_SUITE_PSK,
+++	WLAN_AKM_SUITE_8021X,
+++	WLAN_AKM_SUITE_SAE,
+++};
+++
+++static const struct wiphy_iftype_akm_suites brcmf_iftype_akm_suites[] = {
+++	{
+++		.iftypes_mask = BIT(NL80211_IFTYPE_AP),
+++		.akm_suites = brcmf_ap_akm_suites,
+++		.n_akm_suites = ARRAY_SIZE(brcmf_ap_akm_suites),
+++	},
+++};
+++
+++static const struct wiphy_iftype_akm_suites brcmf_iftype_akm_suites_sae[] = {
+++	{
+++		.iftypes_mask = BIT(NL80211_IFTYPE_AP),
+++		.akm_suites = brcmf_ap_akm_suites_sae,
+++		.n_akm_suites = ARRAY_SIZE(brcmf_ap_akm_suites_sae),
+++	},
+++};
+++
++ /* Vendor specific ie. id = 221, oui and type defines exact ie */
++ struct brcmf_vs_tlv {
++ 	u8 id;
++@@ -7792,6 +7819,14 @@ static int brcmf_setup_wiphy(struct wiphy *wiphy, struct brcmf_if *ifp)
++ 			wiphy_ext_feature_set(wiphy,
++ 					      NL80211_EXT_FEATURE_SAE_OFFLOAD_AP);
++ 	}
+++	if (brcmf_feat_is_enabled(ifp, BRCMF_FEAT_FWAUTH) &&
+++	    brcmf_feat_is_enabled(ifp, BRCMF_FEAT_SAE)) {
+++		wiphy->iftype_akm_suites = brcmf_iftype_akm_suites_sae;
+++		wiphy->num_iftype_akm_suites = ARRAY_SIZE(brcmf_iftype_akm_suites_sae);
+++	} else {
+++		wiphy->iftype_akm_suites = brcmf_iftype_akm_suites;
+++		wiphy->num_iftype_akm_suites = ARRAY_SIZE(brcmf_iftype_akm_suites);
+++	}
++ 	if (brcmf_feat_is_enabled(ifp, BRCMF_FEAT_SAE_EXT))
++ 		wiphy->features |= NL80211_FEATURE_SAE;
++ 	wiphy->mgmt_stypes = brcmf_txrx_stypes;
