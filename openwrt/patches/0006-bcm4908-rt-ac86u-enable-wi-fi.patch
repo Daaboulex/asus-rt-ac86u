@@ -3,7 +3,9 @@ new file mode 100644
 index 0000000..50e9a61
 --- /dev/null
 +++ b/target/linux/bcm4908/base-files/lib/preinit/81_brcmfmac_nvram
-@@ -0,0 +1,40 @@
+@@ -0,0 +1,42 @@
++# SPDX-License-Identifier: GPL-2.0 OR BSD-2-Clause
++
 +brcmfmac_nvram_from_asus_data() {
 +	local file mnt nvram
 +
