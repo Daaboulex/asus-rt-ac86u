@@ -1,9 +1,9 @@
 diff --git a/package/kernel/mac80211/patches/brcm/882-wifi-brcmfmac-report-a-channel-survey-from-chanim_stats.patch b/package/kernel/mac80211/patches/brcm/882-wifi-brcmfmac-report-a-channel-survey-from-chanim_stats.patch
 new file mode 100644
-index 0000000..ab10151
+index 0000000..86bd6dd
 --- /dev/null
 +++ b/package/kernel/mac80211/patches/brcm/882-wifi-brcmfmac-report-a-channel-survey-from-chanim_stats.patch
-@@ -0,0 +1,258 @@
+@@ -0,0 +1,246 @@
 +From: Daaboulex <39669593+Daaboulex@users.noreply.github.com>
 +Subject: [PATCH] wifi: brcmfmac: report a channel survey from chanim_stats
 +
@@ -17,20 +17,18 @@ index 0000000..ab10151
 +Probe chanim_stats at attach and, when the firmware answers with
 +version 2 and dump_obss is absent, answer survey requests from it.
 +Each record is a percentage of its sample period, reported as time out
-+of 100 ms.
++of 100 ms. A record's background noise is the channel's noise; a
++record without one, read as 0 dBm, reports none.
 +
-+The per-channel background noise in these records is sampled during
-+scan dwells together with the traffic and moves by up to 20 dB between
-+scans of the same channel (-60 to -82 dBm seen on one 2.4 GHz channel),
-+while busy time stays within a few points. hostapd weighs noise as
-+2^(noise - min_noise), so a single low reading on a 96% busy channel
-+won the selection. Report one noise floor per band, the lowest reading
-+across its channels, so selection follows the measured busy time.
++The firmware samples that noise during scan dwells together with the
++traffic, and on one 2.4 GHz channel it moved by up to 20 dB between
++scans (-60 to -82 dBm). hostapd weighs noise as 2^(noise - min_noise),
++so a single low reading can win the channel choice for a busy channel.
 +
 +---
 +--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.c
 ++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.c
-+@@ -8212,6 +8212,96 @@
++@@ -8212,6 +8212,87 @@
 + }
 + 
 + static int
@@ -44,7 +42,6 @@ index 0000000..ab10151
 ++	struct ieee80211_supported_band *band;
 ++	enum nl80211_band band_id;
 ++	struct brcmu_chan ch;
-++	s8 noise_floor = 0;
 ++	size_t size;
 ++	u32 count, i;
 ++	u8 busy;
@@ -86,35 +83,27 @@ index 0000000..ab10151
 ++		rec = &list->stats[i];
 ++		ch.chspec = le16_to_cpu(rec->chanspec);
 ++		cfg->d11inf.decchspec(&ch);
-++		if ((ch.band == BRCMU_CHAN_BAND_2G) !=
-++		    (band_id == NL80211_BAND_2GHZ))
-++			continue;
-++		if (rec->bgnoise < noise_floor)
-++			noise_floor = rec->bgnoise;
-++	}
-++
-++	for (i = 0; i < count; i++) {
-++		rec = &list->stats[i];
-++		ch.chspec = le16_to_cpu(rec->chanspec);
-++		cfg->d11inf.decchspec(&ch);
 ++		if (ch.control_ch_num != info->channel->hw_value)
 ++			continue;
 ++		if ((ch.band == BRCMU_CHAN_BAND_2G) !=
 ++		    (band_id == NL80211_BAND_2GHZ))
 ++			continue;
 ++
-++		busy = 100 - min_t(u8, rec->chan_idle, 100);
-++		info->noise = noise_floor;
-++		info->time = 100;
+++		busy = BRCMF_CHANIM_PERCENT -
+++		       min_t(u8, rec->chan_idle, BRCMF_CHANIM_PERCENT);
+++		info->time = BRCMF_CHANIM_PERCENT;
 ++		info->time_busy = busy;
 ++		info->time_tx = rec->ccastats[BRCMF_CCASTATS_TXDUR];
 ++		info->time_rx = rec->ccastats[BRCMF_CCASTATS_INBSS] +
 ++				rec->ccastats[BRCMF_CCASTATS_OBSS] +
 ++				rec->ccastats[BRCMF_CCASTATS_NOCTG] +
 ++				rec->ccastats[BRCMF_CCASTATS_NOPKT];
-++		info->filled = SURVEY_INFO_NOISE_DBM | SURVEY_INFO_TIME |
-++			       SURVEY_INFO_TIME_BUSY | SURVEY_INFO_TIME_RX |
-++			       SURVEY_INFO_TIME_TX;
+++		info->filled = SURVEY_INFO_TIME | SURVEY_INFO_TIME_BUSY |
+++			       SURVEY_INFO_TIME_RX | SURVEY_INFO_TIME_TX;
+++		if (rec->bgnoise < 0) {
+++			info->noise = rec->bgnoise;
+++			info->filled |= SURVEY_INFO_NOISE_DBM;
+++		}
 ++		break;
 ++	}
 ++
@@ -127,7 +116,7 @@ index 0000000..ab10151
 + brcmf_cfg80211_dump_survey(struct wiphy *wiphy, struct net_device *ndev,
 + 			   int idx, struct survey_info *info)
 + {
-+@@ -8476,6 +8566,8 @@
++@@ -8476,6 +8557,8 @@
 + #if !defined(CONFIG_ARCH_BCM2835)
 + 	if (brcmf_feat_is_enabled(ifp, BRCMF_FEAT_DUMP_OBSS))
 + 		ops->dump_survey = brcmf_cfg80211_dump_survey;
@@ -197,15 +186,15 @@ index 0000000..ab10151
 + 	BRCMF_FEAT_DEF(PMKID_V3) \
 +--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/fwil_types.h
 ++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/fwil_types.h
-+@@ -157,6 +157,64 @@
-+ #define BRCMF_NUMCHANNELS		64
++@@ -1236,4 +1236,63 @@
++ 	u8   data[];
++ } __packed;
 + 
-+ #define BRCMF_PFN_MACADDR_CFG_VER	1
-++
 ++#define BRCMF_CHANIM_STATS_VERSION	2
 ++#define BRCMF_CHANIM_COUNT_ALL		0xff
 ++#define BRCMF_CHANIM_COUNT_ONE		0x1
 ++#define BRCMF_CHANIM_STATS_MAX		64
+++#define BRCMF_CHANIM_PERCENT		100
 ++
 ++enum brcmf_ccastats {
 ++	BRCMF_CCASTATS_TXDUR,
@@ -259,6 +248,5 @@ index 0000000..ab10151
 ++	__le32 count;
 ++	struct brcmf_chanim_stats_le stats[];
 ++};
-+ #define BRCMF_PFN_MAC_OUI_ONLY		BIT(0)
-+ #define BRCMF_PFN_SET_MAC_UNASSOC	BIT(1)
-+ 
+++
++ #endif /* FWIL_TYPES_H_ */

@@ -200,10 +200,16 @@ radios capped at 9 dBm per chain.
   2.4 GHz at 20 MHz close by, carrying about 100 Mbit/s of TCP. Close to
   the router the internet line, not the Wi-Fi, set the speed.
 - Automatic channel selection works: with `channel` set to `auto` and
-  `channels` to `1 6 11`, hostapd's ACS read the firmware's busy time per
-  channel and picked the least busy, which matched eight scans of
-  `iw dev <ap> survey dump`. The survey carries no noise floor for
-  channels 12 and 13, which ACS then skips.
+  `channels` to `1 6 11`, hostapd's ACS reads each channel's busy time
+  and its own background noise from the firmware, as
+  `iw dev <ap> survey dump` shows them. Four full Wi-Fi restarts on
+  2026-11-13 all picked channel 6; between them the survey put channels
+  1 and 11 at 56 to 81 % busy and the channel in use at 100 %. The
+  channels outside `channels` kept their first reading across the four
+  restarts. A channel's noise moves by up to 20 dB between scans and
+  hostapd weighs it exponentially, so a low reading can still win the
+  choice for a busy channel. The survey has no record for channels 12
+  and 13, which ACS then skips.
 - Upload lag behind an upstream modem: two parallel `curl` uploads from the
   router saturating the line raised the ping to 1.1.1.1 from about 15 ms
   to 5 s on average and 14 s at worst. Cake from `sqm-scripts` on `wan`,

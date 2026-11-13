@@ -1,6 +1,6 @@
 diff --git a/package/kernel/mac80211/patches/brcm/883-wifi-brcmfmac-expose-the-radio-led-through-leddc.patch b/package/kernel/mac80211/patches/brcm/883-wifi-brcmfmac-expose-the-radio-led-through-leddc.patch
 new file mode 100644
-index 0000000..eb90e53
+index 0000000..847997f
 --- /dev/null
 +++ b/package/kernel/mac80211/patches/brcm/883-wifi-brcmfmac-expose-the-radio-led-through-leddc.patch
 @@ -0,0 +1,149 @@
@@ -36,7 +36,7 @@ index 0000000..eb90e53
 + #include <net/cfg80211.h>
 + #include <net/netlink.h>
 + #include <uapi/linux/if_arp.h>
-+@@ -8481,6 +8483,71 @@ static void brcmf_free_wiphy(struct wiphy *wiphy)
++@@ -8472,6 +8474,71 @@ static void brcmf_free_wiphy(struct wiphy *wiphy)
 + #endif
 + }
 + 
@@ -108,7 +108,7 @@ index 0000000..eb90e53
 + struct brcmf_cfg80211_info *brcmf_cfg80211_attach(struct brcmf_pub *drvr,
 + 						  struct cfg80211_ops *ops,
 + 						  bool p2pdev_forced)
-+@@ -8647,6 +8714,8 @@ struct brcmf_cfg80211_info *brcmf_cfg80211_attach(struct brcmf_pub *drvr,
++@@ -8638,6 +8705,8 @@ struct brcmf_cfg80211_info *brcmf_cfg80211_attach(struct brcmf_pub *drvr,
 + #endif
 + 	}
 + 
@@ -117,7 +117,7 @@ index 0000000..eb90e53
 + 	return cfg;
 + 
 + detach:
-+@@ -8670,6 +8739,7 @@ void brcmf_cfg80211_detach(struct brcmf_cfg80211_info *cfg)
++@@ -8661,6 +8730,7 @@ void brcmf_cfg80211_detach(struct brcmf_cfg80211_info *cfg)
 + 	if (!cfg)
 + 		return;
 + 

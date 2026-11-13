@@ -81,6 +81,24 @@ def test_channel_survey_reports_busy_time(router):
         assert "channel busy time" in router.run(f"iw dev {interface} survey dump"), interface
 
 
+def test_channel_survey_reports_each_channels_own_noise(router):
+    phy = phys(router)[RADIO_2G_SLOT]
+    aps = [
+        ap.removeprefix("hostapd.")
+        for ap in access_points(router)
+        if ap.startswith(f"hostapd.{phy}-")
+    ]
+    if not aps:
+        pytest.skip("no 2.4 GHz access point is configured")
+    router.run(f"iw dev {aps[0]} scan ap-force > /dev/null")
+    noise = [
+        int(n)
+        for n in re.findall(r"noise:\s+(-\d+) dBm", router.run(f"iw dev {aps[0]} survey dump"))
+    ]
+    assert len(noise) >= 3, noise
+    assert len(set(noise)) > 1, noise
+
+
 def test_radios_take_msi_interrupts(router):
     lines = [
         line
