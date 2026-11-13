@@ -49,7 +49,11 @@ in the package build; the tests in `tests/hardware` run against a router.
   holds that rule.
 - The services the image adds change nothing until configured: `pbr` and
   `sqm-scripts` ship switched off, held by
-  `test_added_service_ships_switched_off`.
+  `test_added_service_ships_switched_off`. `adblock` ships with
+  `adb_enabled` off and `https-dns-proxy` with no resolver and its forced
+  DNS and canary domains off, held by `test_dns_services_ship_switched_off`;
+  the `openwrt-shipped-defaults` check fails when upstream changes either
+  default under them.
 - A transmit power set for a radio caps every chain in its firmware:
   `test_configured_transmit_power_caps_every_chain`.
 
@@ -209,3 +213,11 @@ only through the issue its report job opens.
   Thread dongles use. Building every module and publishing them as a signed
   feed was left out: more build time and a signing key to keep, for modules
   nobody has asked for yet.
+- The image also carries `https-dns-proxy` and `adblock` with their LuCI
+  pages (2026-11-13). A flash keeps a service's settings but drops what
+  `apk` installed, and after one flash `dnsmasq` still forwarded to a
+  proxy that was gone, so the router had no DNS, not even to reinstall
+  it. Both ship switched off through `openwrt/files`, OpenWrt's custom
+  files, so a fresh install changes nothing until configured. Reinstalling
+  after every flash and OpenWrt's attended sysupgrade, which builds images
+  only for boards OpenWrt itself supports, were left out.

@@ -23,6 +23,15 @@ def test_usb_serial_driver_is_loaded(router, module):
     assert router.run(f"test -d /sys/module/{module} && echo loaded; true").strip() == "loaded"
 
 
+def test_dns_services_ship_switched_off(router):
+    assert router.run("uci -c /rom/etc/config get adblock.global.adb_enabled").strip() == "0"
+    shipped = router.run("uci -c /rom/etc/config show https-dns-proxy")
+    resolvers = [line for line in shipped.splitlines() if line.endswith("=https-dns-proxy")]
+    assert not resolvers, shipped
+    for option in ("force_dns", "canary_domains_icloud", "canary_domains_mozilla"):
+        assert f"https-dns-proxy.config.{option}='0'" in shipped, shipped
+
+
 @pytest.mark.parametrize("package", ["pbr", "sqm"])
 def test_added_service_ships_switched_off(router, package):
     shipped = router.run(f"uci -c /rom/etc/config show {package}")

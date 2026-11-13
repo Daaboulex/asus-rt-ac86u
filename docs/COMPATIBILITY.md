@@ -110,6 +110,13 @@ the line says so.
   carries WireGuard, the cake shaper with `sqm-scripts`, `pbr`, `iperf3` and
   the USB-serial drivers `cp210x`, `ch341` and `cdc-acm`, held by
   `tests/hardware/test_modules.py`.
+- A firmware update keeps a service's settings but drops a package added
+  with `apk`. On 2026-11-13 a flash kept `https-dns-proxy`'s and
+  `adblock`'s settings and removed both packages: `dnsmasq` still
+  forwarded only to the proxy's port, the router had no DNS, and `apk`
+  could not fetch the packages back until the forwarding was undone by
+  hand. The image therefore carries both, switched off until configured
+  (`test_dns_services_ship_switched_off`).
 - Rescue mode answers at 192.168.1.1 on a LAN port only, directly, through a
   switch, or over Wi-Fi bridged to it. It serves no web page.
   `asus-rescue probe` found it this way on the unit.

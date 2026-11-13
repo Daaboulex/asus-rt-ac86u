@@ -137,6 +137,24 @@
               touch "$out"
             '';
 
+          checks.openwrt-shipped-defaults =
+            let
+              upstream = inputs.openwrt-packages;
+              ours = ./openwrt/files/etc/config;
+            in
+            pkgs.runCommand "openwrt-shipped-defaults" { } ''
+              options() { grep -vE '^[[:space:]]*(#|$)' "$1"; }
+              mainSection() { options "$1" | awk '/^config / { inside = ($2 == "main") } inside'; }
+              options ${upstream}/net/adblock/files/adblock.conf \
+                | sed "s/option adb_enabled '1'/option adb_enabled '0'/" > adblock.expected
+              diff -u adblock.expected ${ours}/adblock
+              mainSection ${upstream}/net/https-dns-proxy/files/etc/config/https-dns-proxy \
+                | sed -E "s/option (canary_domains_icloud|canary_domains_mozilla|force_dns) '1'/option \1 '0'/" \
+                > https-dns-proxy.expected
+              diff -u https-dns-proxy.expected ${ours}/https-dns-proxy
+              touch "$out"
+            '';
+
           checks.lint = pkgs.runCommand "asus-rescue-lint" { nativeBuildInputs = [ pkgs.ruff ]; } ''
             export RUFF_CACHE_DIR="$TMPDIR/ruff-cache"
             cd ${self}

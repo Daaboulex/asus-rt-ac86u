@@ -98,6 +98,9 @@ Three switches open the tests that need more than a look:
 - A kernel module cannot be installed from OpenWrt's package feed. The image
   carries WireGuard, the cake shaper and three USB-serial drivers, switched
   off until configured.
+- A firmware update keeps settings but drops packages added with `apk`. The
+  image therefore carries encrypted DNS (`https-dns-proxy`) and ad blocking
+  (`adblock`), switched off until configured.
 
 The detail and the evidence for each are in
 [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md).

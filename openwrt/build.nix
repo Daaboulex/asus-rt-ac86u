@@ -46,6 +46,7 @@ let
         --exclude='/key-build*' --exclude=/private-key.pem --exclude=/public-key.pem \
         "${openwrt}/" "$work/"
       ${feedCopies}
+      rsync -a --no-owner --no-group --delete --chmod=u+w "$root/openwrt/files/" "$work/files/"
       cd "$work"
       printf '%s\n' "${openwrt.shortRev}" > version
       printf '%s\n' "${toString openwrt.lastModified}" > version.date
