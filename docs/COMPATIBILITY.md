@@ -86,7 +86,12 @@ the line says so.
   `885-wifi-brcmfmac-report-the-AKM-suites-an-access-point-offers`
   declares the AKMs the firmware advertises as given and the wifi scripts
   offer WPA-PSK alone. A Linux client then joined with `MFP:yes`, and with
-  its own PMF off with `MFP:no`.
+  its own PMF off with `MFP:no`. Firmware 10.10.131.81 sometimes refuses
+  the `bip` iovar with `BCME_NOTUP` when a radio comes back from a
+  power-saving stop, which failed the radio's start until patch 891; it
+  beacons BIP-CMAC-128 either way, and on 2026-11-13 sixteen disable and
+  enable cycles kept all four networks up with BIP-CMAC-128 in their
+  beacons.
 - Each access point takes an address the scripts derive from the radio's
   own one, and a rebuild that re-adds only one of a radio's networks can
   hand the networks each other's addresses. A bridge address must lie

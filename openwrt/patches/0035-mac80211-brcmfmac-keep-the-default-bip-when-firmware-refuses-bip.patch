@@ -1,0 +1,62 @@
+diff --git a/package/kernel/mac80211/Makefile b/package/kernel/mac80211/Makefile
+index 13afab0..89c6e62 100644
+--- a/package/kernel/mac80211/Makefile
++++ b/package/kernel/mac80211/Makefile
+@@ -12,7 +12,7 @@ PKG_NAME:=mac80211
+ 
+ PKG_SOURCE_VERSION:=7.2
+ PKG_VERSION:=$(subst -,_,$(PKG_SOURCE_VERSION))
+-PKG_RELEASE:=21
++PKG_RELEASE:=22
+ PKG_LICENSE:=GPL-2.0-only
+ PKG_LICENSE_FILES:=COPYING
+ 
+diff --git a/package/kernel/mac80211/patches/brcm/891-wifi-brcmfmac-keep-the-default-BIP-when-firmware-refuses-bip.patch b/package/kernel/mac80211/patches/brcm/891-wifi-brcmfmac-keep-the-default-BIP-when-firmware-refuses-bip.patch
+new file mode 100644
+index 0000000..83a62d0
+--- /dev/null
++++ b/package/kernel/mac80211/patches/brcm/891-wifi-brcmfmac-keep-the-default-BIP-when-firmware-refuses-bip.patch
+@@ -0,0 +1,43 @@
++From: Daaboulex <39669593+Daaboulex@users.noreply.github.com>
++Subject: [PATCH] wifi: brcmfmac: keep the default BIP when firmware refuses bip
++
++An access point with management frame protection hands the firmware
++its group management cipher through the bip iovar after BRCMF_C_UP.
++BCM4366 firmware 10.10.131.81 sometimes answers BCME_NOTUP there, when
++the radio comes back from a power-saving stop, and brcmfmac then fails
++the whole start: hostapd gives the radio up until it is restarted by
++hand. That firmware beacons BIP-CMAC-128, its default, whether or not
++bip was set, and Broadcom's own driver ignores the same refusal on such
++firmware for that reason.
++
++Go on when bip is refused and the requested cipher is BIP-CMAC-128, the
++one the firmware keeps; refuse to start for any other cipher as before.
++
++---
++--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.c
+++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.c
++@@ -10,6 +10,7 @@
++ #include <linux/etherdevice.h>
++ #include <linux/module.h>
++ #include <linux/vmalloc.h>
+++#include <linux/unaligned.h>
++ #include <linux/ctype.h>
++ #include <linux/leds.h>
++ #include <net/cfg80211.h>
++@@ -4781,6 +4782,16 @@
++ 			err = brcmf_fil_bsscfg_data_set(ifp, "bip",
++ 							&data[offset],
++ 							WPA_IE_MIN_OUI_LEN);
+++			/* Firmware that refuses bip while the BSS comes up
+++			 * beacons BIP-CMAC-128, its default, by itself.
+++			 */
+++			if (err < 0 &&
+++			    get_unaligned_be32(&data[offset]) ==
+++			    WLAN_CIPHER_SUITE_AES_CMAC) {
+++				brcmf_dbg(INFO, "bip refused (%d), firmware keeps BIP-CMAC-128\n",
+++					  err);
+++				err = 0;
+++			}
++ 			if (err < 0) {
++ 				bphy_err(drvr, "bip error %d\n", err);
++ 				goto exit;
