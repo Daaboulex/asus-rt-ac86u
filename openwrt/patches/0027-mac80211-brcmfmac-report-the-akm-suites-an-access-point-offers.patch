@@ -1,6 +1,6 @@
 diff --git a/package/kernel/mac80211/patches/brcm/885-wifi-brcmfmac-report-the-AKM-suites-an-access-point-offers.patch b/package/kernel/mac80211/patches/brcm/885-wifi-brcmfmac-report-the-AKM-suites-an-access-point-offers.patch
 new file mode 100644
-index 0000000..d335322
+index 0000000..4bb01d1
 --- /dev/null
 +++ b/package/kernel/mac80211/patches/brcm/885-wifi-brcmfmac-report-the-AKM-suites-an-access-point-offers.patch
 @@ -0,0 +1,68 @@
@@ -23,7 +23,7 @@ index 0000000..d335322
 +---
 +--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.c
 ++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.c
-+@@ -250,6 +250,33 @@ static const u32 brcmf_cipher_suites[] = {
++@@ -251,6 +251,33 @@
 + 	WLAN_CIPHER_SUITE_AES_CMAC
 + };
 + 
@@ -57,7 +57,7 @@ index 0000000..d335322
 + /* Vendor specific ie. id = 221, oui and type defines exact ie */
 + struct brcmf_vs_tlv {
 + 	u8 id;
-+@@ -7792,6 +7819,14 @@ static int brcmf_setup_wiphy(struct wiphy *wiphy, struct brcmf_if *ifp)
++@@ -7793,6 +7820,14 @@
 + 			wiphy_ext_feature_set(wiphy,
 + 					      NL80211_EXT_FEATURE_SAE_OFFLOAD_AP);
 + 	}

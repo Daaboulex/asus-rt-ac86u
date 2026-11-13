@@ -13,10 +13,10 @@ index 40aac6f..04af074 100644
  
 diff --git a/package/kernel/mac80211/patches/brcm/880-wifi-brcmfmac-enable-2.4-GHz-VHT-on-BCM4366-before-AP-bring-up.patch b/package/kernel/mac80211/patches/brcm/880-wifi-brcmfmac-enable-2.4-GHz-VHT-on-BCM4366-before-AP-bring-up.patch
 new file mode 100644
-index 0000000..855e743
+index 0000000..63bf86a
 --- /dev/null
 +++ b/package/kernel/mac80211/patches/brcm/880-wifi-brcmfmac-enable-2.4-GHz-VHT-on-BCM4366-before-AP-bring-up.patch
-@@ -0,0 +1,97 @@
+@@ -0,0 +1,91 @@
 +From: Jeff Campbell <inca.jeff.campbell@gmail.com>
 +Subject: [PATCH wireless-next] wifi: brcmfmac: enable 2.4 GHz VHT on BCM4366 before AP bring-up
 +Date: Wed,  4 Nov 2026 17:04:26 +0000
@@ -59,6 +59,56 @@ index 0000000..855e743
 + 1 file changed, 32 insertions(+)
 +
 +diff --git a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.c b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.c
++index 46714d871..e971057fb 100644
++--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.c
+++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.c
++@@ -5155,6 +5155,36 @@
++ 	return err;
++ }
++ 
+++#define BRCMF_VHT_FEATURES_2G_ENAB	BIT(0)
+++
+++static void brcmf_cfg80211_4366_2g_vht(struct brcmf_if *ifp,
+++				       const struct cfg80211_chan_def *chandef)
+++{
+++	u32 chip = ifp->drvr->bus_if->chip;
+++	u32 val, want;
+++	s32 err;
+++
+++	if (chandef->chan->band != NL80211_BAND_2GHZ)
+++		return;
+++	if (chip != BRCM_CC_4366_CHIP_ID && chip != BRCM_CC_43664_CHIP_ID &&
+++	    chip != BRCM_CC_43666_CHIP_ID)
+++		return;
+++	err = brcmf_fil_iovar_int_get(ifp, "vht_features", &val);
+++	if (err < 0) {
+++		brcmf_dbg(INFO, "vht_features get failed (%d)\n", err);
+++		return;
+++	}
+++	if (val & BRCMF_VHT_FEATURES_2G_ENAB)
+++		return;
+++	want = val | BRCMF_VHT_FEATURES_2G_ENAB;
+++	err = brcmf_fil_iovar_int_set(ifp, "vht_features", want);
+++	if (err < 0)
+++		bphy_err(ifp->drvr, "vht_features 2.4 GHz enable failed (%d)\n",
+++			 err);
+++	else
+++		brcmf_dbg(INFO, "vht_features 0x%x -> 0x%x\n", val, want);
+++}
+++
++ static s32
++ brcmf_cfg80211_start_ap(struct wiphy *wiphy, struct net_device *ndev,
++ 			struct cfg80211_ap_settings *settings)
++@@ -5299,6 +5329,8 @@
++ 				goto exit;
++ 			}
++ 		}
+++		if (!mbss)
+++			brcmf_cfg80211_4366_2g_vht(ifp, &settings->chandef);
++ 		err = brcmf_fil_cmd_int_set(ifp, BRCMF_C_UP, 1);
++ 		if (err < 0) {
++ 			bphy_err(drvr, "BRCMF_C_UP error (%d)\n", err);
+diff --git a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.c b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.c
 +index 46714d871..e971057fb 100644
 +--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.c
 ++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.c

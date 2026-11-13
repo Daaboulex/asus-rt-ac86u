@@ -1,9 +1,22 @@
+diff --git a/package/kernel/mac80211/Makefile b/package/kernel/mac80211/Makefile
+index 04af074..19e7c57 100644
+--- a/package/kernel/mac80211/Makefile
++++ b/package/kernel/mac80211/Makefile
+@@ -12,7 +12,7 @@ PKG_NAME:=mac80211
+ 
+ PKG_SOURCE_VERSION:=7.2
+ PKG_VERSION:=$(subst -,_,$(PKG_SOURCE_VERSION))
+-PKG_RELEASE:=14
++PKG_RELEASE:=15
+ PKG_LICENSE:=GPL-2.0-only
+ PKG_LICENSE_FILES:=COPYING
+ 
 diff --git a/package/kernel/mac80211/patches/brcm/882-wifi-brcmfmac-report-a-channel-survey-from-chanim_stats.patch b/package/kernel/mac80211/patches/brcm/882-wifi-brcmfmac-report-a-channel-survey-from-chanim_stats.patch
 new file mode 100644
-index 0000000..86bd6dd
+index 0000000..dd0a49b
 --- /dev/null
 +++ b/package/kernel/mac80211/patches/brcm/882-wifi-brcmfmac-report-a-channel-survey-from-chanim_stats.patch
-@@ -0,0 +1,246 @@
+@@ -0,0 +1,272 @@
 +From: Daaboulex <39669593+Daaboulex@users.noreply.github.com>
 +Subject: [PATCH] wifi: brcmfmac: report a channel survey from chanim_stats
 +
@@ -16,6 +29,9 @@ index 0000000..86bd6dd
 +
 +Probe chanim_stats at attach and, when the firmware answers with
 +version 2 and dump_obss is absent, answer survey requests from it.
++Firmware 10.10.131.81 for the same chip answers with version 3 and the
++version 2 record unchanged, nine CCA counters in 36 bytes; take a
++version 3 reply when its length is exactly that record per channel.
 +Each record is a percentage of its sample period, reported as time out
 +of 100 ms. A record's background noise is the channel's noise; a
 +record without one, read as 0 dBm, reports none.
@@ -28,7 +44,7 @@ index 0000000..86bd6dd
 +---
 +--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.c
 ++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.c
-+@@ -8212,6 +8212,87 @@
++@@ -8212,6 +8212,90 @@
 + }
 + 
 + static int
@@ -43,7 +59,7 @@ index 0000000..86bd6dd
 ++	enum nl80211_band band_id;
 ++	struct brcmu_chan ch;
 ++	size_t size;
-++	u32 count, i;
+++	u32 count, version, i;
 ++	u8 busy;
 ++	int err;
 ++
@@ -72,7 +88,10 @@ index 0000000..86bd6dd
 ++	if (err)
 ++		goto exit;
 ++
-++	if (le32_to_cpu(list->version) != BRCMF_CHANIM_STATS_VERSION) {
+++	version = le32_to_cpu(list->version);
+++	if ((version != BRCMF_CHANIM_STATS_VERSION_2 &&
+++	     version != BRCMF_CHANIM_STATS_VERSION_3) ||
+++	    struct_size(list, stats, le32_to_cpu(list->count)) > size) {
 ++		err = -EOPNOTSUPP;
 ++		goto exit;
 ++	}
@@ -116,7 +135,7 @@ index 0000000..86bd6dd
 + brcmf_cfg80211_dump_survey(struct wiphy *wiphy, struct net_device *ndev,
 + 			   int idx, struct survey_info *info)
 + {
-+@@ -8476,6 +8557,8 @@
++@@ -8476,6 +8560,8 @@
 + #if !defined(CONFIG_ARCH_BCM2835)
 + 	if (brcmf_feat_is_enabled(ifp, BRCMF_FEAT_DUMP_OBSS))
 + 		ops->dump_survey = brcmf_cfg80211_dump_survey;
@@ -127,10 +146,26 @@ index 0000000..86bd6dd
 + 	err = wiphy_register(wiphy);
 +--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/feature.c
 ++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/feature.c
-+@@ -203,6 +203,30 @@
++@@ -203,6 +203,48 @@
 + 	ifp->fwil_fwerr = false;
 + }
 + 
+++static bool
+++brcmf_feat_chanim_stats_layout(const struct brcmf_chanim_stats_list_le *list)
+++{
+++	u32 count = le32_to_cpu(list->count);
+++
+++	switch (le32_to_cpu(list->version)) {
+++	case BRCMF_CHANIM_STATS_VERSION_2:
+++		return true;
+++	case BRCMF_CHANIM_STATS_VERSION_3:
+++		return le32_to_cpu(list->buflen) ==
+++		       struct_size(list, stats, count);
+++	default:
+++		return false;
+++	}
+++}
+++
 ++static void brcmf_feat_chanim_stats(struct brcmf_if *ifp)
 ++{
 ++	struct brcmf_chanim_stats_list_le *req;
@@ -144,7 +179,9 @@ index 0000000..86bd6dd
 ++	req->buflen = cpu_to_le32(size);
 ++	req->count = cpu_to_le32(BRCMF_CHANIM_COUNT_ONE);
 ++	err = brcmf_fil_iovar_data_get(ifp, "chanim_stats", req, size);
-++	if (err || le32_to_cpu(req->version) != BRCMF_CHANIM_STATS_VERSION) {
+++	if (!err && !brcmf_feat_chanim_stats_layout(req))
+++		err = -EOPNOTSUPP;
+++	if (err) {
 ++		brcmf_dbg(TRACE, "chanim_stats feature check failed: %d\n", err);
 ++		kfree(req);
 ++		return;
@@ -158,7 +195,7 @@ index 0000000..86bd6dd
 + static void brcmf_feat_iovar_data_set(struct brcmf_if *ifp,
 + 				      enum brcmf_feat_id id, char *name,
 + 				      const void *data, size_t len)
-+@@ -331,6 +355,7 @@
++@@ -331,6 +373,7 @@
 + 	brcmf_feat_iovar_int_get(ifp, BRCMF_FEAT_TDLS, "tdls_enable");
 + 	brcmf_feat_iovar_int_get(ifp, BRCMF_FEAT_MFP, "mfp");
 + 	brcmf_feat_iovar_int_get(ifp, BRCMF_FEAT_DUMP_OBSS, "dump_obss");
@@ -186,11 +223,12 @@ index 0000000..86bd6dd
 + 	BRCMF_FEAT_DEF(PMKID_V3) \
 +--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/fwil_types.h
 ++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/fwil_types.h
-+@@ -1236,4 +1236,63 @@
++@@ -1236,4 +1236,65 @@
 + 	u8   data[];
 + } __packed;
 + 
-++#define BRCMF_CHANIM_STATS_VERSION	2
+++#define BRCMF_CHANIM_STATS_VERSION_2	2
+++#define BRCMF_CHANIM_STATS_VERSION_3	3
 ++#define BRCMF_CHANIM_COUNT_ALL		0xff
 ++#define BRCMF_CHANIM_COUNT_ONE		0x1
 ++#define BRCMF_CHANIM_STATS_MAX		64
@@ -238,7 +276,8 @@ index 0000000..86bd6dd
 ++ * struct brcmf_chanim_stats_list_le - reply of the chanim_stats iovar
 ++ *
 ++ * @buflen: size of the request buffer, then of the reply.
-++ * @version: layout version, %BRCMF_CHANIM_STATS_VERSION.
+++ * @version: layout version, %BRCMF_CHANIM_STATS_VERSION_2, or
+++ *	%BRCMF_CHANIM_STATS_VERSION_3 with the same record.
 ++ * @count: records requested (%BRCMF_CHANIM_COUNT_ALL), then returned.
 ++ * @stats: one record per channel the firmware has sampled.
 ++ */

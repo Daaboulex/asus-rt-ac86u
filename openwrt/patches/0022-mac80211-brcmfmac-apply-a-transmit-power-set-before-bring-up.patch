@@ -1,6 +1,6 @@
 diff --git a/package/kernel/mac80211/patches/brcm/884-wifi-brcmfmac-apply-a-transmit-power-set-before-bring-up.patch b/package/kernel/mac80211/patches/brcm/884-wifi-brcmfmac-apply-a-transmit-power-set-before-bring-up.patch
 new file mode 100644
-index 0000000..2da8e15
+index 0000000..3c7e732
 --- /dev/null
 +++ b/package/kernel/mac80211/patches/brcm/884-wifi-brcmfmac-apply-a-transmit-power-set-before-bring-up.patch
 @@ -0,0 +1,117 @@
@@ -21,7 +21,7 @@ index 0000000..2da8e15
 +---
 +--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.h
 ++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.h
-+@@ -352,6 +352,8 @@
++@@ -354,6 +354,8 @@
 +  * @ibss_starter: indicates this sta is ibss starter.
 +  * @pwr_save: indicate whether dongle to support power save mode.
 +  * @dongle_up: indicate whether dongle up or not.
@@ -30,7 +30,7 @@ index 0000000..2da8e15
 +  * @roam_on: on/off switch for dongle self-roaming.
 +  * @scan_tried: indicates if first scan attempted.
 +  * @dcmd_buf: dcmd buffer.
-+@@ -385,6 +387,8 @@
++@@ -387,6 +389,8 @@
 + 	bool ibss_starter;
 + 	bool pwr_save;
 + 	bool dongle_up;
@@ -41,7 +41,7 @@ index 0000000..2da8e15
 + 	u8 *extra_buf;
 +--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.c
 ++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.c
-+@@ -2681,6 +2681,25 @@
++@@ -2682,6 +2682,25 @@
 + 	return err;
 + }
 + 
@@ -67,7 +67,7 @@ index 0000000..2da8e15
 + static s32
 + brcmf_cfg80211_set_tx_power(struct wiphy *wiphy, struct wireless_dev *wdev,
 + 			    int radio_idx, enum nl80211_tx_power_setting type,
-+@@ -2691,12 +2710,9 @@
++@@ -2692,12 +2711,9 @@
 + 	struct brcmf_if *ifp = netdev_priv(ndev);
 + 	struct brcmf_pub *drvr = cfg->pub;
 + 	s32 err;
@@ -80,7 +80,7 @@ index 0000000..2da8e15
 + 
 + 	switch (type) {
 + 	case NL80211_TX_POWER_AUTOMATIC:
-+@@ -2718,15 +2734,13 @@
++@@ -2719,15 +2735,13 @@
 + 		err = -EINVAL;
 + 		goto done;
 + 	}
@@ -103,7 +103,7 @@ index 0000000..2da8e15
 + 
 + done:
 + 	brcmf_dbg(TRACE, "Exit %d (qdbm)\n", qdbm & ~WL_TXPWR_OVERRIDE);
-+@@ -7902,9 +7916,16 @@
++@@ -7903,9 +7917,16 @@
 + 
 + static s32 __brcmf_cfg80211_up(struct brcmf_if *ifp)
 + {
