@@ -1,9 +1,21 @@
+diff --git a/target/linux/bcm4908/config-6.18 b/target/linux/bcm4908/config-6.18
+index e41f5e3..a50f457 100644
+--- a/target/linux/bcm4908/config-6.18
++++ b/target/linux/bcm4908/config-6.18
+@@ -44,6 +44,7 @@ CONFIG_AUDIT_ARCH_COMPAT_GENERIC=y
+ CONFIG_B53=y
+ CONFIG_BCM4908_ENET=y
+ CONFIG_BCM7038_WDT=y
++CONFIG_BCM7038_WDT_SUBSYS_INITCALL=y
+ CONFIG_BCM7XXX_PHY=y
+ CONFIG_BCM_NET_PHYLIB=y
+ CONFIG_BCM_PMB=y
 diff --git a/target/linux/bcm4908/patches-6.18/099-watchdog-bcm7038_wdt-arm-the-watchdog-when-the-kernel-panics.patch b/target/linux/bcm4908/patches-6.18/099-watchdog-bcm7038_wdt-arm-the-watchdog-when-the-kernel-panics.patch
 new file mode 100644
 index 0000000..719eb68
 --- /dev/null
 +++ b/target/linux/bcm4908/patches-6.18/099-watchdog-bcm7038_wdt-arm-the-watchdog-when-the-kernel-panics.patch
-@@ -0,0 +1,109 @@
+@@ -0,0 +1,127 @@
 +From: Daaboulex <39669593+Daaboulex@users.noreply.github.com>
 +Subject: [PATCH] watchdog: bcm7038_wdt: arm the watchdog when the kernel panics
 +
@@ -17,12 +29,32 @@ index 0000000..719eb68
 +reset. A panic timeout of zero asks to wait forever and is honoured:
 +the watchdog is left alone.
 +
-+Register the driver at subsys_initcall rather than with the other
-+device drivers, so the notifier exists before they probe: a lockup in
-+an early probe panics before a device_initcall watchdog would exist.
-+The watchdog core already queues a device registered this early.
++With BCM7038_WDT_SUBSYS_INITCALL, register the driver at
++subsys_initcall rather than with the other device drivers, so the
++notifier exists before they probe: a lockup in an early probe panics
++before a device_initcall watchdog would exist. The watchdog core
++already queues a device registered this early. The option follows
++GPIO_WATCHDOG_ARCH_INITCALL.
 +
 +---
++--- a/drivers/watchdog/Kconfig
+++++ b/drivers/watchdog/Kconfig
++@@ -1955,6 +1955,15 @@ config BCM7038_WDT
++ 	  watchdog block, including some cable modem chips and DSL (63xx)
++ 	  chips.
++ 
+++config BCM7038_WDT_SUBSYS_INITCALL
+++	bool "Register the BCM7038 watchdog before other device drivers"
+++	depends on BCM7038_WDT=y
+++	help
+++	  Register the driver at subsys_initcall instead of module_init, so
+++	  its panic notifier exists before the other device drivers probe
+++	  and a panic during an early probe still ends in a reset.
+++	  If in doubt, say N.
+++
++ config IMGPDC_WDT
++ 	tristate "Imagination Technologies PDC Watchdog Timer"
++ 	depends on HAS_IOMEM
 +--- a/drivers/watchdog/bcm7038_wdt.c
 ++++ b/drivers/watchdog/bcm7038_wdt.c
 +@@ -9,6 +9,8 @@
@@ -49,7 +81,7 @@ index 0000000..719eb68
 + };
 + 
 + static bool nowayout = WATCHDOG_NOWAYOUT;
-+@@ -113,6 +117,31 @@
++@@ -113,6 +117,31 @@ static unsigned int bcm7038_wdt_get_timeleft(struct watchdog_device *wdog)
 + 	return time_left / wdt->rate;
 + }
 + 
@@ -81,7 +113,7 @@ index 0000000..719eb68
 + static const struct watchdog_info bcm7038_wdt_info = {
 + 	.identity	= "Broadcom BCM7038 Watchdog Timer",
 + 	.options	= WDIOF_SETTIMEOUT | WDIOF_KEEPALIVEPING |
-+@@ -174,6 +203,12 @@
++@@ -174,6 +203,12 @@ static int bcm7038_wdt_probe(struct platform_device *pdev)
 + 	if (err)
 + 		return err;
 + 
@@ -94,22 +126,20 @@ index 0000000..719eb68
 + 	dev_info(dev, "Registered BCM7038 Watchdog\n");
 + 
 + 	return 0;
-+@@ -224,7 +259,17 @@
++@@ -224,7 +259,16 @@ static struct platform_driver bcm7038_wdt_driver = {
 + 		.pm		= pm_sleep_ptr(&bcm7038_wdt_pm_ops),
 + 	}
 + };
-+-module_platform_driver(bcm7038_wdt_driver);
+++
+++#ifdef CONFIG_BCM7038_WDT_SUBSYS_INITCALL
 ++static int __init bcm7038_wdt_init(void)
 ++{
 ++	return platform_driver_register(&bcm7038_wdt_driver);
 ++}
 ++subsys_initcall(bcm7038_wdt_init);
-++
-++static void __exit bcm7038_wdt_exit(void)
-++{
-++	platform_driver_unregister(&bcm7038_wdt_driver);
-++}
-++module_exit(bcm7038_wdt_exit);
+++#else
++ module_platform_driver(bcm7038_wdt_driver);
+++#endif
 + 
 + module_param(nowayout, bool, 0);
 + MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default="
