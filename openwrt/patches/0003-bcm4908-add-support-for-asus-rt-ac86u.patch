@@ -11,12 +11,12 @@ index 0974331..c69a6b8 100644
  		tplink,archer-c2300-v1)		echo "";;
  	esac
 diff --git a/target/linux/bcm4908/image/Makefile b/target/linux/bcm4908/image/Makefile
-index 678881f..2c93c88 100644
+index 678881f..3541375 100644
 --- a/target/linux/bcm4908/image/Makefile
 +++ b/target/linux/bcm4908/image/Makefile
-@@ -87,6 +87,22 @@ define Device/asus_gt-ac5300
+@@ -97,6 +97,22 @@ define Device/asus_gt-ax6000
  endef
- TARGET_DEVICES += asus_gt-ac5300
+ # TARGET_DEVICES += asus_gt-ax6000
  
 +define Device/asus_rt-ac86u
 +  DEVICE_VENDOR := ASUS
@@ -34,9 +34,9 @@ index 678881f..2c93c88 100644
 +endef
 +TARGET_DEVICES += asus_rt-ac86u
 +
- define Device/asus_gt-ax6000
-   DEVICE_VENDOR := ASUS
-   DEVICE_MODEL := GT-AX6000
+ define Device/netgear_r8000p
+   DEVICE_VENDOR := Netgear
+   DEVICE_MODEL := R8000P
 diff --git a/target/linux/bcm4908/image/asus_rt-ac86u/rom/etc/image_ident b/target/linux/bcm4908/image/asus_rt-ac86u/rom/etc/image_ident
 new file mode 100644
 index 0000000..30b5274
