@@ -32,7 +32,19 @@ def test_dns_services_ship_switched_off(router):
         assert f"https-dns-proxy.config.{option}='0'" in shipped, shipped
 
 
-@pytest.mark.parametrize("package", ["pbr", "sqm"])
+def test_qosify_ships_shaping_nothing(router):
+    shipped = router.run("uci -c /rom/etc/config show qosify")
+    sections = [
+        line.split("=")[0]
+        for line in shipped.splitlines()
+        if line.endswith(("=interface", "=device"))
+    ]
+    assert sections, shipped
+    for section in sections:
+        assert f"{section}.disabled='1'" in shipped, shipped
+
+
+@pytest.mark.parametrize("package", ["pbr", "sqm", "upnpd"])
 def test_added_service_ships_switched_off(router, package):
     shipped = router.run(f"uci -c /rom/etc/config show {package}")
     switches = [line.split("=", 1)[1] for line in shipped.splitlines() if ".enabled=" in line]

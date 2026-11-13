@@ -70,6 +70,7 @@ pkgs.buildFHSEnv {
       bc
       bison
       bzip2
+      clang
       coreutils
       curl
       diffutils
@@ -88,6 +89,7 @@ pkgs.buildFHSEnv {
       gnutar
       gzip
       libxslt
+      llvm
       ncurses
       openssl
       patch

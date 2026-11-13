@@ -107,8 +107,9 @@ the line says so.
   `6.18.60~b63c2fab` and the feed's `6.18.60~868fdef7`, and
   `apk add --simulate kmod-wireguard` answered "no such package", while
   `iperf3`, which has no kernel module, installed. The image therefore
-  carries WireGuard, the cake shaper with `sqm-scripts`, `pbr`, `iperf3` and
-  the USB-serial drivers `cp210x`, `ch341` and `cdc-acm`, held by
+  carries WireGuard, the cake shaper with `sqm-scripts`, `qosify` with its
+  `sched-bpf` and `sched-flower` modules, `pbr`, `iperf3` and the
+  USB-serial drivers `cp210x`, `ch341` and `cdc-acm`, held by
   `tests/hardware/test_modules.py`.
 - A firmware update keeps a service's settings but drops a package added
   with `apk`. On 2026-11-13 a flash kept `https-dns-proxy`'s and

@@ -53,7 +53,9 @@ in the package build; the tests in `tests/hardware` run against a router.
   `adb_enabled` off and `https-dns-proxy` with no resolver and its forced
   DNS and canary domains off, held by `test_dns_services_ship_switched_off`;
   the `openwrt-shipped-defaults` check fails when upstream changes either
-  default under them.
+  default under them. `miniupnpd` ships with `enabled` off, held by
+  `test_added_service_ships_switched_off`, and `qosify` with its WAN
+  interface and device disabled, held by `test_qosify_ships_shaping_nothing`.
 - A transmit power set for a radio caps every chain in its firmware:
   `test_configured_transmit_power_caps_every_chain`.
 
@@ -221,3 +223,12 @@ only through the issue its report job opens.
   files, so a fresh install changes nothing until configured. Reinstalling
   after every flash and OpenWrt's attended sysupgrade, which builds images
   only for boards OpenWrt itself supports, were left out.
+- The image also carries UPnP (`miniupnpd-nftables`) for game consoles,
+  `qosify` for traffic priority, LuCI's dashboard and its Material theme
+  (2026-11-13). `qosify` needs `kmod-sched-bpf` and `kmod-sched-flower`,
+  which only the image can bring, and an eBPF program, which compiles
+  with the LLVM nixpkgs puts in the build environment
+  (`CONFIG_BPF_TOOLCHAIN_HOST`): a git build has no prebuilt BPF
+  toolchain, and building LLVM inside OpenWrt costs hours. `qosify` and
+  `sqm-scripts` each attach cake to the WAN, so switching `qosify` on
+  means switching `sqm` off.

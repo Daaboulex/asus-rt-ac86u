@@ -96,8 +96,8 @@ Three switches open the tests that need more than a look:
 - The router reports no temperatures.
 - Rescue mode answers on a LAN port only, and serves no web page.
 - A kernel module cannot be installed from OpenWrt's package feed. The image
-  carries WireGuard, the cake shaper and three USB-serial drivers, switched
-  off until configured.
+  carries WireGuard, the cake shaper, `qosify` traffic priority, UPnP and
+  three USB-serial drivers, switched off until configured.
 - A firmware update keeps settings but drops packages added with `apk`. The
   image therefore carries encrypted DNS (`https-dns-proxy`) and ad blocking
   (`adblock`), switched off until configured.
