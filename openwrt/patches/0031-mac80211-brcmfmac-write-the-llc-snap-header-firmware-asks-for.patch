@@ -1,0 +1,205 @@
+diff --git a/package/kernel/mac80211/Makefile b/package/kernel/mac80211/Makefile
+index eb01ab4..8fbe002 100644
+--- a/package/kernel/mac80211/Makefile
++++ b/package/kernel/mac80211/Makefile
+@@ -12,7 +12,7 @@ PKG_NAME:=mac80211
+ 
+ PKG_SOURCE_VERSION:=7.2
+ PKG_VERSION:=$(subst -,_,$(PKG_SOURCE_VERSION))
+-PKG_RELEASE:=16
++PKG_RELEASE:=17
+ PKG_LICENSE:=GPL-2.0-only
+ PKG_LICENSE_FILES:=COPYING
+ 
+diff --git a/package/kernel/mac80211/patches/brcm/887-wifi-brcmfmac-pcie-write-the-LLC-SNAP-header-firmware-asks-the-host-for.patch b/package/kernel/mac80211/patches/brcm/887-wifi-brcmfmac-pcie-write-the-LLC-SNAP-header-firmware-asks-the-host-for.patch
+new file mode 100644
+index 0000000..8291794
+--- /dev/null
++++ b/package/kernel/mac80211/patches/brcm/887-wifi-brcmfmac-pcie-write-the-LLC-SNAP-header-firmware-asks-the-host-for.patch
+@@ -0,0 +1,186 @@
++From: Daaboulex <39669593+Daaboulex@users.noreply.github.com>
++Subject: [PATCH] wifi: brcmfmac: pcie: write the LLC/SNAP header firmware asks the host for
++
++Broadcom's BCA dongle firmware from the AX SDK, 4366c0 10.10.131.81
++among it, sets bit 21 of the shared flags (host assisted LLC/SNAP): it
++reads an 802.3 header with an LLC/SNAP header from the 22 bytes before
++the payload of every transmitted frame instead of building one from
++the Ethernet header in the work item. brcmfmac leaves those bytes as
++they happen to be, so the firmware sends every data frame, the EAPOL
++handshake included, with a garbage header, and no client ever
++receives one.
++
++When the firmware sets the flag, write the header into eight bytes of
++headroom before the frame is posted, map the buffer from the header on
++so a bounce buffer carries it too, and point the work item at the
++payload; turn the frame back into Ethernet before it is requeued or
++completed, so the rest of the driver sees what it queued.
++
++---
++--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/bus.h
+++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/bus.h
++@@ -130,6 +130,7 @@
++ 	u16 max_flowrings;
++ 	u16 max_submissionrings;
++ 	u16 max_completionrings;
+++	bool tx_llcsnap;
++ };
++ 
++ 
++--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/pcie.c
+++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/pcie.c
++@@ -219,6 +219,7 @@
++ #define BRCMF_PCIE_SHARED_VERSION_MASK		0x00FF
++ #define BRCMF_PCIE_SHARED_DMA_INDEX		0x10000
++ #define BRCMF_PCIE_SHARED_DMA_2B_IDX		0x100000
+++#define BRCMF_PCIE_SHARED_TX_LLCSNAP		0x200000
++ #define BRCMF_PCIE_SHARED_HOSTRDY_DB1		0x10000000
++ 
++ #define BRCMF_PCIE_FLAGS_HTOD_SPLIT		0x4000
++@@ -2214,6 +2215,8 @@
++ 	bus->msgbuf->rx_dataoffset = devinfo->shared.rx_dataoffset;
++ 	bus->msgbuf->max_rxbufpost = devinfo->shared.max_rxbufpost;
++ 	bus->msgbuf->max_flowrings = devinfo->shared.max_flowrings;
+++	bus->msgbuf->tx_llcsnap = devinfo->shared.flags &
+++				  BRCMF_PCIE_SHARED_TX_LLCSNAP;
++ 
++ 	init_waitqueue_head(&devinfo->mbdata_resp_wait);
++ 
++--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/msgbuf.c
+++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/msgbuf.c
++@@ -11,6 +11,7 @@
++ #include <linux/types.h>
++ #include <linux/netdevice.h>
++ #include <linux/etherdevice.h>
+++#include <linux/unaligned.h>
++ 
++ #include <brcmu_utils.h>
++ #include <brcmu_wifi.h>
++@@ -68,6 +69,7 @@
++ #define BRCMF_MSGBUF_TX_FLUSH_CNT2		96
++ 
++ #define BRCMF_MSGBUF_DELAY_TXWORKER_THRS	96
+++#define BRCMF_MSGBUF_LLCSNAP_LEN		8
++ #define BRCMF_MSGBUF_TRICKLE_TXWORKER_THRS	32
++ #define BRCMF_MSGBUF_UPDATE_RX_PTR_THRS		48
++ 
++@@ -240,6 +242,7 @@
++ 	u16 rx_dataoffset;
++ 	u32 max_rxbufpost;
++ 	u16 rx_metadata_offset;
+++	bool tx_llcsnap;
++ 	u32 rxbufpost;
++ 
++ 	u32 max_ioctlrespbuf;
++@@ -695,6 +698,37 @@
++ }
++ 
++ 
+++static int brcmf_msgbuf_tx_llcsnap_push(struct sk_buff *skb)
+++{
+++	struct ethhdr eh;
+++	u8 *hdr;
+++
+++	if (skb->len < ETH_HLEN)
+++		return -EINVAL;
+++	if (skb_cow_head(skb, BRCMF_MSGBUF_LLCSNAP_LEN))
+++		return -ENOMEM;
+++
+++	memcpy(&eh, skb->data, ETH_HLEN);
+++	hdr = skb_push(skb, BRCMF_MSGBUF_LLCSNAP_LEN);
+++	memcpy(hdr, eh.h_dest, ETH_ALEN);
+++	memcpy(hdr + ETH_ALEN, eh.h_source, ETH_ALEN);
+++	put_unaligned_be16(skb->len - ETH_HLEN, hdr + 2 * ETH_ALEN);
+++	hdr[ETH_HLEN] = 0xaa;
+++	hdr[ETH_HLEN + 1] = 0xaa;
+++	hdr[ETH_HLEN + 2] = 0x03;
+++	hdr[ETH_HLEN + 3] = 0x00;
+++	hdr[ETH_HLEN + 4] = 0x00;
+++	hdr[ETH_HLEN + 5] = (eh.h_proto == htons(ETH_P_AARP) ||
+++			     eh.h_proto == htons(ETH_P_IPX)) ? 0xf8 : 0x00;
+++	return 0;
+++}
+++
+++static void brcmf_msgbuf_tx_llcsnap_pull(struct sk_buff *skb)
+++{
+++	memmove(skb->data + BRCMF_MSGBUF_LLCSNAP_LEN, skb->data, 2 * ETH_ALEN);
+++	skb_pull(skb, BRCMF_MSGBUF_LLCSNAP_LEN);
+++}
+++
++ static void brcmf_msgbuf_txflow(struct brcmf_msgbuf *msgbuf, u16 flowid)
++ {
++ 	struct brcmf_flowring *flow = msgbuf->flow;
++@@ -707,6 +741,7 @@
++ 	u32 pktid;
++ 	struct msgbuf_tx_msghdr *tx_msghdr;
++ 	u64 address;
+++	u32 hdrlen;
++ 
++ 	commonring = msgbuf->flowrings[flowid];
++ 	if (!brcmf_commonring_write_available(commonring))
++@@ -723,9 +758,22 @@
++ 			break;
++ 		}
++ 		skb_orphan(skb);
+++		hdrlen = ETH_HLEN;
+++		if (msgbuf->tx_llcsnap) {
+++			if (brcmf_msgbuf_tx_llcsnap_push(skb)) {
+++				brcmf_txfinalize(brcmf_get_ifp(drvr,
+++					brcmf_flowring_ifidx_get(flow, flowid)),
+++					skb, false);
+++				continue;
+++			}
+++			hdrlen += BRCMF_MSGBUF_LLCSNAP_LEN;
+++		}
++ 		if (brcmf_msgbuf_alloc_pktid(msgbuf->drvr->bus_if->dev,
++-					     msgbuf->tx_pktids, skb, ETH_HLEN,
+++					     msgbuf->tx_pktids, skb,
+++					     msgbuf->tx_llcsnap ? 0 : ETH_HLEN,
++ 					     &physaddr, &pktid)) {
+++			if (msgbuf->tx_llcsnap)
+++				brcmf_msgbuf_tx_llcsnap_pull(skb);
++ 			brcmf_flowring_reinsert(flow, flowid, skb);
++ 			bphy_err(drvr, "No PKTID available !!\n");
++ 			break;
++@@ -734,6 +782,8 @@
++ 		if (!ret_ptr) {
++ 			brcmf_msgbuf_get_pktid(msgbuf->drvr->bus_if->dev,
++ 					       msgbuf->tx_pktids, pktid);
+++			if (msgbuf->tx_llcsnap)
+++				brcmf_msgbuf_tx_llcsnap_pull(skb);
++ 			brcmf_flowring_reinsert(flow, flowid, skb);
++ 			break;
++ 		}
++@@ -748,9 +798,13 @@
++ 		tx_msghdr->flags |= (skb->priority & 0x07) <<
++ 				    BRCMF_MSGBUF_PKT_FLAGS_PRIO_SHIFT;
++ 		tx_msghdr->seg_cnt = 1;
++-		memcpy(tx_msghdr->txhdr, skb->data, ETH_HLEN);
++-		tx_msghdr->data_len = cpu_to_le16(skb->len - ETH_HLEN);
+++		memcpy(tx_msghdr->txhdr, skb->data, 2 * ETH_ALEN);
+++		memcpy(tx_msghdr->txhdr + 2 * ETH_ALEN,
+++		       skb->data + hdrlen - sizeof(__be16), sizeof(__be16));
+++		tx_msghdr->data_len = cpu_to_le16(skb->len - hdrlen);
++ 		address = (u64)physaddr;
+++		if (msgbuf->tx_llcsnap)
+++			address += hdrlen;
++ 		tx_msghdr->data_buf_addr.high_addr = cpu_to_le32(address >> 32);
++ 		tx_msghdr->data_buf_addr.low_addr =
++ 			cpu_to_le32(address & 0xffffffff);
++@@ -895,6 +949,8 @@
++ 	commonring = msgbuf->flowrings[flowid];
++ 	atomic_dec(&commonring->outstanding_tx);
++ 
+++	if (msgbuf->tx_llcsnap)
+++		brcmf_msgbuf_tx_llcsnap_pull(skb);
++ 	brcmf_txfinalize(brcmf_get_ifp(msgbuf->drvr, tx_status->msg.ifidx),
++ 			 skb, true);
++ }
++@@ -1594,6 +1650,7 @@
++ 		goto fail;
++ 
++ 	msgbuf->rx_dataoffset = if_msgbuf->rx_dataoffset;
+++	msgbuf->tx_llcsnap = if_msgbuf->tx_llcsnap;
++ 	msgbuf->max_rxbufpost = if_msgbuf->max_rxbufpost;
++ 
++ 	msgbuf->max_ioctlrespbuf = BRCMF_MSGBUF_MAX_IOCTLRESPBUF_POST;
