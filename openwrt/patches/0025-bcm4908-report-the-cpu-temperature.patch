@@ -1,5 +1,5 @@
 diff --git a/target/linux/bcm4908/config-6.18 b/target/linux/bcm4908/config-6.18
-index 3ec2cbd..7d07b72 100644
+index 3ad0cec..974cef9 100644
 --- a/target/linux/bcm4908/config-6.18
 +++ b/target/linux/bcm4908/config-6.18
 @@ -43,6 +43,7 @@ CONFIG_ARM_PSCI_FW=y
@@ -33,21 +33,22 @@ index 3ec2cbd..7d07b72 100644
  CONFIG_TIMER_OF=y
 diff --git a/target/linux/bcm4908/patches-6.18/814-dt-bindings-thermal-add-brcm-bcm4908-thermal.patch b/target/linux/bcm4908/patches-6.18/814-dt-bindings-thermal-add-brcm-bcm4908-thermal.patch
 new file mode 100644
-index 0000000..2e3e231
+index 0000000..64194b4
 --- /dev/null
 +++ b/target/linux/bcm4908/patches-6.18/814-dt-bindings-thermal-add-brcm-bcm4908-thermal.patch
-@@ -0,0 +1,52 @@
+@@ -0,0 +1,54 @@
 +From: Daaboulex <39669593+Daaboulex@users.noreply.github.com>
 +Subject: [PATCH] dt-bindings: thermal: add brcm,bcm4908-thermal
 +
-+The CPU cluster of the BCM4908 family carries a temperature sensor read
-+from one status register in the cluster's configuration block. Describe
-+it as a thermal sensor.
++The CPU cluster of the BCM4908 family has a thermal throttle unit in
++the BIU control block of its URB register block: a temperature register
++followed by its interrupt and threshold registers. Describe the unit as
++a thermal sensor.
 +
 +---
 +--- /dev/null
 ++++ b/Documentation/devicetree/bindings/thermal/brcm,bcm4908-thermal.yaml
-+@@ -0,0 +1,41 @@
++@@ -0,0 +1,42 @@
 ++# SPDX-License-Identifier: GPL-2.0-only OR BSD-2-Clause
 ++%YAML 1.2
 ++---
@@ -60,8 +61,9 @@ index 0000000..2e3e231
 ++  - Daaboulex <39669593+Daaboulex@users.noreply.github.com>
 ++
 ++description:
-++  Temperature sensor of the CPU cluster in Broadcom BCM4908 family SoCs,
-++  read from a status register in the cluster's configuration block.
+++  Thermal throttle unit of the CPU cluster in Broadcom BCM4908 family
+++  SoCs, in the BIU control block of the URB register block. Its first
+++  register holds the temperature reading.
 ++
 ++allOf:
 ++  - $ref: thermal-sensor.yaml#
@@ -84,31 +86,36 @@ index 0000000..2e3e231
 ++
 ++examples:
 ++  - |
-++    thermal-sensor@810621a0 {
+++    thermal-sensor@21a0 {
 ++        compatible = "brcm,bcm4908-thermal";
-++        reg = <0x810621a0 0x4>;
+++        reg = <0x21a0 0x18>;
 ++        #thermal-sensor-cells = <0>;
 ++    };
 diff --git a/target/linux/bcm4908/patches-6.18/815-thermal-broadcom-add-a-bcm4908-thermal-sensor-driver.patch b/target/linux/bcm4908/patches-6.18/815-thermal-broadcom-add-a-bcm4908-thermal-sensor-driver.patch
 new file mode 100644
-index 0000000..d893a3a
+index 0000000..b96ace4
 --- /dev/null
 +++ b/target/linux/bcm4908/patches-6.18/815-thermal-broadcom-add-a-bcm4908-thermal-sensor-driver.patch
-@@ -0,0 +1,109 @@
+@@ -0,0 +1,116 @@
 +From: Daaboulex <39669593+Daaboulex@users.noreply.github.com>
 +Subject: [PATCH] thermal: broadcom: add a BCM4908 thermal sensor driver
 +
-+The sensor's 10-bit reading sits at 0x810621a0, in the configuration
-+block of the CPU cluster. Broadcom's GPL thermal driver in vendor
-+firmware for these SoCs reads it there and converts it to millidegrees
-+Celsius as (4133500 - 4906 * raw) / 10. Register it as a thermal zone
-+sensor with the same conversion, and add the zone to hwmon as the other
-+Broadcom thermal drivers do.
++The sensor's reading is the low 10 bits of the first register of the
++CPU cluster's thermal throttle unit, therm_throttle_temp at 0x810621a0
++in Broadcom's register map. Broadcom's GPL thermal driver in vendor
++firmware for these SoCs reads those bits and converts them to
++millidegrees Celsius as (4133500 - 4906 * raw) / 10. Register it as a
++thermal zone sensor with the same conversion, and add the zone to hwmon
++as the other Broadcom thermal drivers do.
++
++Nothing in Broadcom's sources gives the register a valid flag: on the
++unit bits 10 to 30 read zero and bit 31 reads one in every sample, and
++the vendor driver masks them off, so the driver does too.
 +
 +---
 +--- a/drivers/thermal/broadcom/Kconfig
 ++++ b/drivers/thermal/broadcom/Kconfig
-+@@ -14,6 +14,15 @@ config BCM2835_THERMAL
++@@ -14,6 +14,17 @@ config BCM2835_THERMAL
 + 	help
 + 	  Support for thermal sensors on Broadcom bcm2835 SoCs.
 + 
@@ -119,7 +126,9 @@ index 0000000..d893a3a
 ++	depends on THERMAL_OF
 ++	help
 ++	  Support for the temperature sensor of the CPU cluster in Broadcom
-++	  BCM4908 family SoCs.
+++	  BCM4908 family SoCs. The driver registers it as a thermal zone
+++	  sensor, which THERMAL_HWMON also shows as a hwmon device, so the
+++	  CPU temperature can be read from either.
 ++
 + config BRCMSTB_THERMAL
 + 	tristate "Broadcom STB AVS TMON thermal driver"
@@ -206,16 +215,16 @@ index 0000000..d893a3a
 ++MODULE_LICENSE("GPL");
 diff --git a/target/linux/bcm4908/patches-6.18/318-arm64-dts-broadcom-bcmbca-bcm4908-add-the-cpu-thermal-sensor.patch b/target/linux/bcm4908/patches-6.18/318-arm64-dts-broadcom-bcmbca-bcm4908-add-the-cpu-thermal-sensor.patch
 new file mode 100644
-index 0000000..61b8d74
+index 0000000..5497302
 --- /dev/null
 +++ b/target/linux/bcm4908/patches-6.18/318-arm64-dts-broadcom-bcmbca-bcm4908-add-the-cpu-thermal-sensor.patch
-@@ -0,0 +1,43 @@
+@@ -0,0 +1,41 @@
 +From: Daaboulex <39669593+Daaboulex@users.noreply.github.com>
 +Subject: [PATCH] arm64: dts: broadcom: bcmbca: bcm4908: add the CPU thermal sensor
 +
-+The CPU thermal sensor sits in the cluster's configuration block at
-+0x81060000, beyond the window of the axi bus, which ends after the GIC.
-+Widen the window to cover that block, describe the sensor and give it a
++The CPU cluster's thermal throttle unit sits at 0x1a0 in the BIU
++control block of the URB register block at 0x81060000. Describe the
++URB block as a bus with the unit in it, and give the sensor a
 +cpu-thermal zone. The zone has no trip points: the vendor driver's
 +throttling and shutdown temperatures are not documented for this SoC,
 +and a trip without a cooling device would act on one misread value.
@@ -223,23 +232,19 @@ index 0000000..61b8d74
 +---
 +--- a/arch/arm64/boot/dts/broadcom/bcmbca/bcm4908.dtsi
 ++++ b/arch/arm64/boot/dts/broadcom/bcmbca/bcm4908.dtsi
-+@@ -82,7 +82,7 @@
-+ 		compatible = "simple-bus";
-+ 		#address-cells = <1>;
-+ 		#size-cells = <1>;
-+-		ranges = <0x00 0x00 0x81000000 0x4000>;
-++		ranges = <0x00 0x00 0x81000000 0x64000>;
-+ 
-+ 		gic: interrupt-controller@1000 {
-+ 			compatible = "arm,gic-400";
-+@@ -92,6 +92,20 @@
-+ 			reg = <0x1000 0x1000>,
-+ 			      <0x2000 0x2000>;
++@@ -94,6 +94,27 @@
 + 		};
++ 	};
++ 
+++	bus@81060000 {
+++		compatible = "simple-bus";
+++		#address-cells = <1>;
+++		#size-cells = <1>;
+++		ranges = <0x00 0x00 0x81060000 0x4000>;
 ++
-++		cpu_thermal_sensor: thermal-sensor@621a0 {
+++		cpu_thermal_sensor: thermal-sensor@21a0 {
 ++			compatible = "brcm,bcm4908-thermal";
-++			reg = <0x621a0 0x4>;
+++			reg = <0x21a0 0x18>;
 ++			#thermal-sensor-cells = <0>;
 ++		};
 ++	};
@@ -250,6 +255,8 @@ index 0000000..61b8d74
 ++			polling-delay = <0>;
 ++			thermal-sensors = <&cpu_thermal_sensor>;
 ++		};
-+ 	};
-+ 
+++	};
+++
 + 	timer {
++ 		compatible = "arm,armv8-timer";
++ 		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,

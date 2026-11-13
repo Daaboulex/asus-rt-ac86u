@@ -131,9 +131,15 @@ the line says so.
   (`dirty_expire_centisecs` 3000, `dirty_writeback_centisecs` 500). On
   2026-11-12 a deliberate panic 31 s after a rollback brought the rejected
   firewall rule back at the next boot.
-- The CPU temperature comes from a sensor in the CPU cluster's
-  configuration block, register 0x810621a0. The vendor's GPL thermal
-  driver reads its low 10 bits as (4133500 - 4906 * raw) / 10
+- The CPU temperature comes from the CPU cluster's thermal throttle
+  unit: the low 10 bits of `therm_throttle_temp`, register 0x810621a0, at
+  0x1a0 in the BIU control block of the URB block at 0x81060000
+  (Broadcom's `4908_map_part.h`). On 2026-11-13 the whole register read
+  0x800002BE to 0x800002C0 in 40 samples: bits 10 to 30 zero and bit 31
+  set, a bit no Broadcom source names, and the unit's interrupt and
+  threshold registers after it read zero. The BCM2711 sensor's valid
+  bits 10 and 16 are zero here, so its driver does not fit. The vendor's
+  GPL thermal driver reads the low 10 bits as (4133500 - 4906 * raw) / 10
   millidegrees, and patch
   `815-thermal-broadcom-add-a-bcm4908-thermal-sensor-driver` reports it
   the same way, as the thermal zone `cpu-thermal`, also shown in hwmon as
