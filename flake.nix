@@ -62,6 +62,8 @@
           pre-commit.settings.hooks.typos.settings.config.default.extend-identifiers.MODULE_PARM_DESC =
             "MODULE_PARM_DESC";
           pre-commit.settings.hooks.typos.settings.config.default.extend-identifiers.sme_state = "sme_state";
+          pre-commit.settings.hooks.typos.settings.config.default.extend-identifiers.nd_enabled =
+            "nd_enabled";
 
           packages.default = pkgs.python312.pkgs.callPackage ./package.nix { };
 
