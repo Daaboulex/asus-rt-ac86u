@@ -51,3 +51,9 @@ every repo goes to `Daaboulex/nix-packaging-standard` as an issue or a change, a
 repo with the next release.
 
 ## This project
+
+- A patch to an OpenWrt package bumps that package's `PKG_RELEASE` in the same outer patch, so a
+  package manager sees the change.
+- Kernel patches take OpenWrt's numbering bands: 3xx for device trees and bindings, 7xx for network
+  drivers, 8xx for other drivers.
+- The `Test:` line of a change to the image names the hardware suite's result on the unit.
