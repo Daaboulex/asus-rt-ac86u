@@ -1,9 +1,22 @@
+diff --git a/package/kernel/mac80211/Makefile b/package/kernel/mac80211/Makefile
+index 19e7c57..eb01ab4 100644
+--- a/package/kernel/mac80211/Makefile
++++ b/package/kernel/mac80211/Makefile
+@@ -12,7 +12,7 @@ PKG_NAME:=mac80211
+ 
+ PKG_SOURCE_VERSION:=7.2
+ PKG_VERSION:=$(subst -,_,$(PKG_SOURCE_VERSION))
+-PKG_RELEASE:=15
++PKG_RELEASE:=16
+ PKG_LICENSE:=GPL-2.0-only
+ PKG_LICENSE_FILES:=COPYING
+ 
 diff --git a/package/kernel/mac80211/patches/brcm/883-wifi-brcmfmac-expose-the-radio-led-through-leddc.patch b/package/kernel/mac80211/patches/brcm/883-wifi-brcmfmac-expose-the-radio-led-through-leddc.patch
 new file mode 100644
-index 0000000..e35d066
+index 0000000..c173b2e
 --- /dev/null
 +++ b/package/kernel/mac80211/patches/brcm/883-wifi-brcmfmac-expose-the-radio-led-through-leddc.patch
-@@ -0,0 +1,149 @@
+@@ -0,0 +1,171 @@
 +From: Daaboulex <39669593+Daaboulex@users.noreply.github.com>
 +Subject: [PATCH] wifi: brcmfmac: expose the radio LED through leddc
 +
@@ -17,7 +30,9 @@ index 0000000..e35d066
 +restores the duty cycle the firmware started with, the board's own,
 +and off sets a zero on time. The device takes any trigger, so the
 +netdev trigger on the radio's interface shows the band down, up and
-+passing traffic.
++passing traffic. The LED goes before brcmf_detach removes the
++interfaces, since the trigger switches it off as they go down and that
++brightness work must not run against a freed interface.
 +
 +---
 +--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.c
@@ -95,7 +110,7 @@ index 0000000..e35d066
 ++	cfg->led = led;
 ++}
 ++
-++static void brcmf_led_detach(struct brcmf_cfg80211_info *cfg)
+++void brcmf_cfg80211_led_detach(struct brcmf_cfg80211_info *cfg)
 ++{
 ++	if (!cfg->led)
 ++		return;
@@ -121,7 +136,7 @@ index 0000000..e35d066
 + 	if (!cfg)
 + 		return;
 + 
-++	brcmf_led_detach(cfg);
+++	brcmf_cfg80211_led_detach(cfg);
 + 	brcmf_pno_detach(cfg);
 + 	brcmf_btcoex_detach(cfg);
 + 	wiphy_unregister(cfg->wiphy);
@@ -153,3 +168,23 @@ index 0000000..e35d066
 + };
 + 
 + /**
++@@ -467,6 +472,7 @@
++ 						  struct cfg80211_ops *ops,
++ 						  bool p2pdev_forced);
++ void brcmf_cfg80211_detach(struct brcmf_cfg80211_info *cfg);
+++void brcmf_cfg80211_led_detach(struct brcmf_cfg80211_info *cfg);
++ s32 brcmf_cfg80211_up(struct net_device *ndev);
++ s32 brcmf_cfg80211_down(struct net_device *ndev);
++ struct cfg80211_ops *brcmf_cfg80211_get_ops(struct brcmf_mp_device *settings);
++--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/core.c
+++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/core.c
++@@ -1487,6 +1487,9 @@
++ 	unregister_inet6addr_notifier(&drvr->inet6addr_notifier);
++ #endif
++ 
+++	if (drvr->config)
+++		brcmf_cfg80211_led_detach(drvr->config);
+++
++ 	brcmf_bus_change_state(bus_if, BRCMF_BUS_DOWN);
++ 	/* make sure primary interface removed last */
++ 	for (i = BRCMF_MAX_IFS - 1; i > -1; i--) {
