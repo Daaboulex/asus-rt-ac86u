@@ -1,11 +1,11 @@
 diff --git a/target/linux/bcm4908/base-files/etc/board.d/01_leds b/target/linux/bcm4908/base-files/etc/board.d/01_leds
-index 56357da..27fe901 100755
+index 8079ead..6183d92 100755
 --- a/target/linux/bcm4908/base-files/etc/board.d/01_leds
 +++ b/target/linux/bcm4908/base-files/etc/board.d/01_leds
-@@ -13,6 +13,8 @@ asus,rt-ac86u)
- 	ucidef_set_led_netdev "lan2" "LAN2" "white:lan-2" "lan2" "link tx rx"
+@@ -14,6 +14,8 @@ asus,rt-ac86u)
  	ucidef_set_led_netdev "lan3" "LAN3" "white:lan-3" "lan3" "link tx rx"
  	ucidef_set_led_netdev "lan4" "LAN4" "white:lan-4" "lan4" "link tx rx"
+ 	ucidef_set_led_netdev "wan" "WAN" "white:wan" "wan" "link tx rx"
 +	ucidef_set_led_netdev "wlan-phy0" "WLAN phy0" "brcmfmac-phy0" "phy0-ap0" "link tx rx"
 +	ucidef_set_led_netdev "wlan-phy1" "WLAN phy1" "brcmfmac-phy1" "phy1-ap0" "link tx rx"
  	;;

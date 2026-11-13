@@ -10,28 +10,10 @@ def test_every_led_is_registered(router):
     assert not missing, missing
 
 
-def wan_is_up(router) -> bool:
-    return "true" in router.run("ifstatus wan | jsonfilter -e '@.up'")
-
-
-@pytest.mark.disruptive
-def test_internet_led_shows_the_wan_state(router):
-    if not wan_is_up(router):
-        pytest.skip("wan is not up, so the up state cannot be checked")
-    try:
-        router.run("ifdown wan")
-        time.sleep(4)
-        assert router.led("red:wan")[0] > 0
-        assert router.led("white:wan")[0] == 0
-    finally:
-        router.run("ifup wan")
-    for _ in range(20):
-        time.sleep(2)
-        if wan_is_up(router):
-            break
-    time.sleep(2)
-    assert router.led("red:wan")[0] == 0
+def test_internet_led_follows_the_wan_port(router):
     assert router.led("white:wan")[1] == "netdev"
+    assert router.sysfs("/sys/class/leds/white:wan/device_name") == "wan"
+    assert router.led("red:wan") == (0, "none")
 
 
 @pytest.mark.disruptive
@@ -56,7 +38,7 @@ def test_wifi_led_follows_its_access_point(router, slot):
     "led,question",
     [
         ("white:power", "Is the power LED lit, steady?"),
-        ("white:wan", "Is the internet LED white (WAN has an address)?"),
+        ("white:wan", "Is the internet LED white (WAN port linked)?"),
         ("brcmfmac-phy0", "Is the 2.4 GHz LED lit?"),
         ("brcmfmac-phy1", "Is the 5 GHz LED lit?"),
     ],
