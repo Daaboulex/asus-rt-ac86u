@@ -118,6 +118,15 @@ the line says so.
   could not fetch the packages back until the forwarding was undone by
   hand. The image therefore carries both, switched off until configured
   (`test_dns_services_ship_switched_off`).
+- `https-dns-proxy`'s forced DNS can come up rejecting queries instead of
+  redirecting them. The proxy decides once, as it starts, from whether
+  anything listens on port 53. With `adblock`'s lists loaded, `dnsmasq`
+  took about 7 s to listen again after a restart. On 2026-11-13 the proxy
+  restarted inside that gap, and a device asking 1.1.1.1 directly got no
+  answer at all. A `redirect` in `/etc/config/firewall` (`src_dport 53`,
+  `target DNAT`, `family any`) and a `rule` rejecting port 853, with the
+  proxy's `force_dns` off, intercept the same queries with nothing decided
+  at start.
 - Rescue mode answers at 192.168.1.1 on a LAN port only, directly, through a
   switch, or over Wi-Fi bridged to it. It serves no web page.
   `asus-rescue probe` found it this way on the unit.
