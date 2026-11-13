@@ -12,10 +12,10 @@ index 2d29512..d4eae29 100644
  CONFIG_EXCLUSIVE_SYSTEM_RAM=y
 diff --git a/target/linux/bcm4908/patches-6.18/315-arm64-dts-broadcom-bcmbca-rt-ac86u-fence-the-radios-DMA.patch b/target/linux/bcm4908/patches-6.18/315-arm64-dts-broadcom-bcmbca-rt-ac86u-fence-the-radios-DMA.patch
 new file mode 100644
-index 0000000..8b68dc2
+index 0000000..410c0a7
 --- /dev/null
 +++ b/target/linux/bcm4908/patches-6.18/315-arm64-dts-broadcom-bcmbca-rt-ac86u-fence-the-radios-DMA.patch
-@@ -0,0 +1,56 @@
+@@ -0,0 +1,71 @@
 +From: Daaboulex <39669593+Daaboulex@users.noreply.github.com>
 +Subject: [PATCH] arm64: dts: broadcom: bcmbca: rt-ac86u: fence the radios DMA
 +
@@ -28,14 +28,29 @@ index 0000000..8b68dc2
 +
 +Each window maps its pool at the pool's own address. A pool seen at
 +PCI address 0 hands its first buffer out at bus address 0, and the
-+radio given that buffer never answered its first command. At the top
-+of RAM the DMA zone still spans all memory, so the kernel keeps no
-+bounce buffer of its own for the other devices.
++radio given that buffer never answered its first command.
++
++The narrower window ends the kernel's DMA zone at 0x1e000000, below
++the top of RAM, so the kernel sets aside a 64 MiB default bounce
++buffer, and MemTotal falls from 436784 kB to 370476 kB. No device
++here uses it: the radios bounce through their own pools and every
++other device reaches all of RAM. Turn it off with swiotlb=noforce on
++the board's command line, which replaces the target's and so repeats
++its earlycon and console.
 +
 +---
 +--- a/arch/arm64/boot/dts/broadcom/bcmbca/bcm4906-asus-rt-ac86u.dts
 ++++ b/arch/arm64/boot/dts/broadcom/bcmbca/bcm4906-asus-rt-ac86u.dts
-+@@ -22,6 +22,18 @@
++@@ -17,11 +17,27 @@
++ 		led-upgrade = &led_power;
++ 	};
++ 
+++	chosen {
+++		bootargs = "earlycon=bcm63xx_uart,0xff800640 console=ttyS0,115200 swiotlb=noforce";
+++	};
+++
++ 	memory@0 {
++ 		device_type = "memory";
 + 		reg = <0x00 0x00 0x00 0x20000000>;
 + 	};
 + 
@@ -54,7 +69,7 @@ index 0000000..8b68dc2
 + 	gpio-keys-polled {
 + 		compatible = "gpio-keys-polled";
 + 		poll-interval = <20>;
-+@@ -239,13 +251,15 @@
++@@ -239,13 +255,15 @@
 + };
 + 
 + &pcie0 {
