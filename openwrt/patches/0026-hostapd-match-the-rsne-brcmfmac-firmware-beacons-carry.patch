@@ -1,0 +1,43 @@
+diff --git a/package/network/services/hostapd/patches/990-AP-write-the-default-management-group-cipher-into-the-RSNE.patch b/package/network/services/hostapd/patches/990-AP-write-the-default-management-group-cipher-into-the-RSNE.patch
+new file mode 100644
+index 0000000..f33fde8
+--- /dev/null
++++ b/package/network/services/hostapd/patches/990-AP-write-the-default-management-group-cipher-into-the-RSNE.patch
+@@ -0,0 +1,37 @@
++From: Daaboulex <39669593+Daaboulex@users.noreply.github.com>
++Subject: [PATCH] AP: write the default management group cipher into the RSNE
++
++With management frame protection enabled, wpa_write_rsn_ie() leaves
++out the PMKID Count and the Management Group Cipher Suite when the
++cipher is the default BIP-CMAC-128. Broadcom FullMAC firmware driven
++by brcmfmac builds the beacon and probe response RSNE itself and
++always writes that field, so the RSNE hostapd sends in message 3 of
++the 4-way handshake differs from the one in the beacon, and stations
++abort with reason 17 (IE in 4-way handshake differs).
++
++Write the field for BIP-CMAC-128 as well. The element stays valid:
++the field is optional for the default cipher, not forbidden.
++
++---
++--- a/src/ap/wpa_auth_ie.c
+++++ b/src/ap/wpa_auth_ie.c
++@@ -341,8 +341,7 @@ static u8 * rsne_write_data(u8 *buf, size_t len, u8 *pos, int group,
++ 	}
++ 
++ 
++-	if (mfp != NO_MGMT_FRAME_PROTECTION &&
++-	    group_mgmt_cipher != WPA_CIPHER_AES_128_CMAC) {
+++	if (mfp != NO_MGMT_FRAME_PROTECTION) {
++ 		if (2 + 4 > buf + len - pos)
++ 			return NULL;
++ 		if (!pmkid) {
++@@ -353,6 +352,9 @@ static u8 * rsne_write_data(u8 *buf, size_t len, u8 *pos, int group,
++ 
++ 		/* Management Group Cipher Suite */
++ 		switch (group_mgmt_cipher) {
+++		case WPA_CIPHER_AES_128_CMAC:
+++			RSN_SELECTOR_PUT(pos, RSN_CIPHER_SUITE_AES_128_CMAC);
+++			break;
++ 		case WPA_CIPHER_BIP_GMAC_128:
++ 			RSN_SELECTOR_PUT(pos, RSN_CIPHER_SUITE_BIP_GMAC_128);
++ 			break;
