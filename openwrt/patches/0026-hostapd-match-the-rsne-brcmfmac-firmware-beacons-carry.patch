@@ -13,7 +13,7 @@ index 5246248..ce8ceb2 100644
  PKG_SOURCE_PROTO:=git
 diff --git a/package/network/services/hostapd/patches/056-AP-write-the-default-management-group-cipher-when-the-driver-does-AP-MLME.patch b/package/network/services/hostapd/patches/056-AP-write-the-default-management-group-cipher-when-the-driver-does-AP-MLME.patch
 new file mode 100644
-index 0000000..f33fde8
+index 0000000..cf468f0
 --- /dev/null
 +++ b/package/network/services/hostapd/patches/056-AP-write-the-default-management-group-cipher-when-the-driver-does-AP-MLME.patch
 @@ -0,0 +1,96 @@

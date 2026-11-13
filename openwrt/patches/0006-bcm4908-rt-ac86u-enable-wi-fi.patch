@@ -1,6 +1,6 @@
 diff --git a/target/linux/bcm4908/base-files/lib/preinit/81_brcmfmac_nvram b/target/linux/bcm4908/base-files/lib/preinit/81_brcmfmac_nvram
 new file mode 100644
-index 0000000..50e9a61
+index 0000000..23d0459
 --- /dev/null
 +++ b/target/linux/bcm4908/base-files/lib/preinit/81_brcmfmac_nvram
 @@ -0,0 +1,42 @@
@@ -59,7 +59,7 @@ index 4d469f6..016ed7a 100644
  CONFIG_LEDS_GPIO=y
  CONFIG_LIBFDT=y
 diff --git a/target/linux/bcm4908/image/Makefile b/target/linux/bcm4908/image/Makefile
-index 2c93c88..03ce45e 100644
+index 3541375..1bc168c 100644
 --- a/target/linux/bcm4908/image/Makefile
 +++ b/target/linux/bcm4908/image/Makefile
 @@ -93,6 +93,7 @@ define Device/asus_rt-ac86u

@@ -1,6 +1,6 @@
 diff --git a/target/linux/bcm4908/patches-6.18/811-leds-bcm63138-honour-default-state.patch b/target/linux/bcm4908/patches-6.18/811-leds-bcm63138-honour-default-state.patch
 new file mode 100644
-index 0000000..06ac39e
+index 0000000..16aeb34
 --- /dev/null
 +++ b/target/linux/bcm4908/patches-6.18/811-leds-bcm63138-honour-default-state.patch
 @@ -0,0 +1,44 @@

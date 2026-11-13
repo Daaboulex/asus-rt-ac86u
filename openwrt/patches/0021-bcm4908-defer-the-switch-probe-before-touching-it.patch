@@ -1,6 +1,6 @@
 diff --git a/target/linux/bcm4908/patches-6.18/710-net-dsa-bcm_sf2-defer-the-probe-before-touching-the-switch.patch b/target/linux/bcm4908/patches-6.18/710-net-dsa-bcm_sf2-defer-the-probe-before-touching-the-switch.patch
 new file mode 100644
-index 0000000..fe83ef0
+index 0000000..294a326
 --- /dev/null
 +++ b/target/linux/bcm4908/patches-6.18/710-net-dsa-bcm_sf2-defer-the-probe-before-touching-the-switch.patch
 @@ -0,0 +1,56 @@
