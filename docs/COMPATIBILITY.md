@@ -135,7 +135,7 @@ the line says so.
   configuration block, register 0x810621a0. The vendor's GPL thermal
   driver reads its low 10 bits as (4133500 - 4906 * raw) / 10
   millidegrees, and patch
-  `105-thermal-broadcom-add-a-bcm4908-thermal-sensor-driver` reports it
+  `815-thermal-broadcom-add-a-bcm4908-thermal-sensor-driver` reports it
   the same way, as the thermal zone `cpu-thermal`, also shown in hwmon as
   `cpu_thermal`, which LuCI's dashboard files under CPU. On 2026-11-13 it
   read 66.0 C idle, 69.4 C after 10 s and 71.4 C after 60 s on all four

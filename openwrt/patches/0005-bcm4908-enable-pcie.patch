@@ -60,11 +60,11 @@ index e6179ae..4d469f6 100644
  CONFIG_RFS_ACCEL=y
  CONFIG_RPS=y
  CONFIG_RWSEM_SPIN_ON_OWNER=y
-diff --git a/target/linux/bcm4908/patches-6.18/092-arm64-dts-broadcom-bcm4908-add-PCIe-controllers.patch b/target/linux/bcm4908/patches-6.18/092-arm64-dts-broadcom-bcm4908-add-PCIe-controllers.patch
+diff --git a/target/linux/bcm4908/patches-6.18/312-arm64-dts-broadcom-bcm4908-add-PCIe-controllers.patch b/target/linux/bcm4908/patches-6.18/312-arm64-dts-broadcom-bcm4908-add-PCIe-controllers.patch
 new file mode 100644
 index 0000000..f1606bc
 --- /dev/null
-+++ b/target/linux/bcm4908/patches-6.18/092-arm64-dts-broadcom-bcm4908-add-PCIe-controllers.patch
++++ b/target/linux/bcm4908/patches-6.18/312-arm64-dts-broadcom-bcm4908-add-PCIe-controllers.patch
 @@ -0,0 +1,67 @@
 +From: Daaboulex <39669593+Daaboulex@users.noreply.github.com>
 +Subject: [PATCH] arm64: dts: broadcom: bcm4908: add PCIe controllers
@@ -133,11 +133,11 @@ index 0000000..f1606bc
 + 				compatible = "brcm,bcm4908-misc-pcie-reset";
 + 				reg = <0x44 0x04>;
 + 				#reset-cells = <1>;
-diff --git a/target/linux/bcm4908/patches-6.18/093-PCI-brcmstb-map-BCM4908-inbound-windows-through-UBUS.patch b/target/linux/bcm4908/patches-6.18/093-PCI-brcmstb-map-BCM4908-inbound-windows-through-UBUS.patch
+diff --git a/target/linux/bcm4908/patches-6.18/810-PCI-brcmstb-map-BCM4908-inbound-windows-through-UBUS.patch b/target/linux/bcm4908/patches-6.18/810-PCI-brcmstb-map-BCM4908-inbound-windows-through-UBUS.patch
 new file mode 100644
 index 0000000..3528bac
 --- /dev/null
-+++ b/target/linux/bcm4908/patches-6.18/093-PCI-brcmstb-map-BCM4908-inbound-windows-through-UBUS.patch
++++ b/target/linux/bcm4908/patches-6.18/810-PCI-brcmstb-map-BCM4908-inbound-windows-through-UBUS.patch
 @@ -0,0 +1,87 @@
 +From: Daaboulex <39669593+Daaboulex@users.noreply.github.com>
 +Subject: [PATCH] PCI: brcmstb: Map BCM4908 inbound windows through UBUS
@@ -226,11 +226,11 @@ index 0000000..3528bac
 + 	.num_inbound_wins = 3,
 + };
 + 
-diff --git a/target/linux/bcm4908/patches-6.18/094-arm64-dts-broadcom-bcmbca-rt-ac86u-enable-PCIe.patch b/target/linux/bcm4908/patches-6.18/094-arm64-dts-broadcom-bcmbca-rt-ac86u-enable-PCIe.patch
+diff --git a/target/linux/bcm4908/patches-6.18/313-arm64-dts-broadcom-bcmbca-rt-ac86u-enable-PCIe.patch b/target/linux/bcm4908/patches-6.18/313-arm64-dts-broadcom-bcmbca-rt-ac86u-enable-PCIe.patch
 new file mode 100644
 index 0000000..ff8e143
 --- /dev/null
-+++ b/target/linux/bcm4908/patches-6.18/094-arm64-dts-broadcom-bcmbca-rt-ac86u-enable-PCIe.patch
++++ b/target/linux/bcm4908/patches-6.18/313-arm64-dts-broadcom-bcmbca-rt-ac86u-enable-PCIe.patch
 @@ -0,0 +1,27 @@
 +From: Daaboulex <39669593+Daaboulex@users.noreply.github.com>
 +Subject: [PATCH] arm64: dts: broadcom: bcmbca: rt-ac86u: enable PCIe

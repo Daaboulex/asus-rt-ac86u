@@ -10,11 +10,11 @@ index e41f5e3..a50f457 100644
  CONFIG_BCM7XXX_PHY=y
  CONFIG_BCM_NET_PHYLIB=y
  CONFIG_BCM_PMB=y
-diff --git a/target/linux/bcm4908/patches-6.18/099-watchdog-bcm7038_wdt-arm-the-watchdog-when-the-kernel-panics.patch b/target/linux/bcm4908/patches-6.18/099-watchdog-bcm7038_wdt-arm-the-watchdog-when-the-kernel-panics.patch
+diff --git a/target/linux/bcm4908/patches-6.18/812-watchdog-bcm7038_wdt-arm-the-watchdog-when-the-kernel-panics.patch b/target/linux/bcm4908/patches-6.18/812-watchdog-bcm7038_wdt-arm-the-watchdog-when-the-kernel-panics.patch
 new file mode 100644
 index 0000000..719eb68
 --- /dev/null
-+++ b/target/linux/bcm4908/patches-6.18/099-watchdog-bcm7038_wdt-arm-the-watchdog-when-the-kernel-panics.patch
++++ b/target/linux/bcm4908/patches-6.18/812-watchdog-bcm7038_wdt-arm-the-watchdog-when-the-kernel-panics.patch
 @@ -0,0 +1,127 @@
 +From: Daaboulex <39669593+Daaboulex@users.noreply.github.com>
 +Subject: [PATCH] watchdog: bcm7038_wdt: arm the watchdog when the kernel panics

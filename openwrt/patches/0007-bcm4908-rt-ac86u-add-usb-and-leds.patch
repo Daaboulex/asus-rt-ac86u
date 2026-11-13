@@ -26,11 +26,11 @@ index 0000000..8079ead
 +board_config_flush
 +
 +exit 0
-diff --git a/target/linux/bcm4908/patches-6.18/095-arm64-dts-broadcom-bcmbca-rt-ac86u-add-USB-and-LEDs.patch b/target/linux/bcm4908/patches-6.18/095-arm64-dts-broadcom-bcmbca-rt-ac86u-add-USB-and-LEDs.patch
+diff --git a/target/linux/bcm4908/patches-6.18/314-arm64-dts-broadcom-bcmbca-rt-ac86u-add-USB-and-LEDs.patch b/target/linux/bcm4908/patches-6.18/314-arm64-dts-broadcom-bcmbca-rt-ac86u-add-USB-and-LEDs.patch
 new file mode 100644
 index 0000000..6dee32d
 --- /dev/null
-+++ b/target/linux/bcm4908/patches-6.18/095-arm64-dts-broadcom-bcmbca-rt-ac86u-add-USB-and-LEDs.patch
++++ b/target/linux/bcm4908/patches-6.18/314-arm64-dts-broadcom-bcmbca-rt-ac86u-add-USB-and-LEDs.patch
 @@ -0,0 +1,134 @@
 +From: Daaboulex <39669593+Daaboulex@users.noreply.github.com>
 +Subject: [PATCH] arm64: dts: broadcom: bcmbca: rt-ac86u: add USB and LEDs

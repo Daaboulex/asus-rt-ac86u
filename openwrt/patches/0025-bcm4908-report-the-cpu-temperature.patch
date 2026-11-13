@@ -31,11 +31,11 @@ index 3ec2cbd..7d07b72 100644
  CONFIG_THREAD_INFO_IN_TASK=y
  CONFIG_TICK_CPU_ACCOUNTING=y
  CONFIG_TIMER_OF=y
-diff --git a/target/linux/bcm4908/patches-6.18/104-dt-bindings-thermal-add-brcm-bcm4908-thermal.patch b/target/linux/bcm4908/patches-6.18/104-dt-bindings-thermal-add-brcm-bcm4908-thermal.patch
+diff --git a/target/linux/bcm4908/patches-6.18/814-dt-bindings-thermal-add-brcm-bcm4908-thermal.patch b/target/linux/bcm4908/patches-6.18/814-dt-bindings-thermal-add-brcm-bcm4908-thermal.patch
 new file mode 100644
 index 0000000..2e3e231
 --- /dev/null
-+++ b/target/linux/bcm4908/patches-6.18/104-dt-bindings-thermal-add-brcm-bcm4908-thermal.patch
++++ b/target/linux/bcm4908/patches-6.18/814-dt-bindings-thermal-add-brcm-bcm4908-thermal.patch
 @@ -0,0 +1,52 @@
 +From: Daaboulex <39669593+Daaboulex@users.noreply.github.com>
 +Subject: [PATCH] dt-bindings: thermal: add brcm,bcm4908-thermal
@@ -89,11 +89,11 @@ index 0000000..2e3e231
 ++        reg = <0x810621a0 0x4>;
 ++        #thermal-sensor-cells = <0>;
 ++    };
-diff --git a/target/linux/bcm4908/patches-6.18/105-thermal-broadcom-add-a-bcm4908-thermal-sensor-driver.patch b/target/linux/bcm4908/patches-6.18/105-thermal-broadcom-add-a-bcm4908-thermal-sensor-driver.patch
+diff --git a/target/linux/bcm4908/patches-6.18/815-thermal-broadcom-add-a-bcm4908-thermal-sensor-driver.patch b/target/linux/bcm4908/patches-6.18/815-thermal-broadcom-add-a-bcm4908-thermal-sensor-driver.patch
 new file mode 100644
 index 0000000..d893a3a
 --- /dev/null
-+++ b/target/linux/bcm4908/patches-6.18/105-thermal-broadcom-add-a-bcm4908-thermal-sensor-driver.patch
++++ b/target/linux/bcm4908/patches-6.18/815-thermal-broadcom-add-a-bcm4908-thermal-sensor-driver.patch
 @@ -0,0 +1,109 @@
 +From: Daaboulex <39669593+Daaboulex@users.noreply.github.com>
 +Subject: [PATCH] thermal: broadcom: add a BCM4908 thermal sensor driver
@@ -204,11 +204,11 @@ index 0000000..d893a3a
 ++
 ++MODULE_DESCRIPTION("Broadcom BCM4908 thermal sensor driver");
 ++MODULE_LICENSE("GPL");
-diff --git a/target/linux/bcm4908/patches-6.18/106-arm64-dts-broadcom-bcmbca-bcm4908-add-the-cpu-thermal-sensor.patch b/target/linux/bcm4908/patches-6.18/106-arm64-dts-broadcom-bcmbca-bcm4908-add-the-cpu-thermal-sensor.patch
+diff --git a/target/linux/bcm4908/patches-6.18/318-arm64-dts-broadcom-bcmbca-bcm4908-add-the-cpu-thermal-sensor.patch b/target/linux/bcm4908/patches-6.18/318-arm64-dts-broadcom-bcmbca-bcm4908-add-the-cpu-thermal-sensor.patch
 new file mode 100644
 index 0000000..61b8d74
 --- /dev/null
-+++ b/target/linux/bcm4908/patches-6.18/106-arm64-dts-broadcom-bcmbca-bcm4908-add-the-cpu-thermal-sensor.patch
++++ b/target/linux/bcm4908/patches-6.18/318-arm64-dts-broadcom-bcmbca-bcm4908-add-the-cpu-thermal-sensor.patch
 @@ -0,0 +1,43 @@
 +From: Daaboulex <39669593+Daaboulex@users.noreply.github.com>
 +Subject: [PATCH] arm64: dts: broadcom: bcmbca: bcm4908: add the CPU thermal sensor

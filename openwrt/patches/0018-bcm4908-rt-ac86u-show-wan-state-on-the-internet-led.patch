@@ -51,11 +51,11 @@ index 17644d1..b335554 100755
  else
  	: > "$dark"
  	for led in /sys/class/leds/*; do
-diff --git a/target/linux/bcm4908/patches-6.18/100-arm64-dts-broadcom-bcmbca-rt-ac86u-light-the-red-wan-led-at-boot.patch b/target/linux/bcm4908/patches-6.18/100-arm64-dts-broadcom-bcmbca-rt-ac86u-light-the-red-wan-led-at-boot.patch
+diff --git a/target/linux/bcm4908/patches-6.18/317-arm64-dts-broadcom-bcmbca-rt-ac86u-light-the-red-wan-led-at-boot.patch b/target/linux/bcm4908/patches-6.18/317-arm64-dts-broadcom-bcmbca-rt-ac86u-light-the-red-wan-led-at-boot.patch
 new file mode 100644
 index 0000000..6ce7aed
 --- /dev/null
-+++ b/target/linux/bcm4908/patches-6.18/100-arm64-dts-broadcom-bcmbca-rt-ac86u-light-the-red-wan-led-at-boot.patch
++++ b/target/linux/bcm4908/patches-6.18/317-arm64-dts-broadcom-bcmbca-rt-ac86u-light-the-red-wan-led-at-boot.patch
 @@ -0,0 +1,18 @@
 +From: Daaboulex <39669593+Daaboulex@users.noreply.github.com>
 +Subject: [PATCH] arm64: dts: broadcom: bcmbca: rt-ac86u: light the red wan led at boot

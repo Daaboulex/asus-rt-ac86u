@@ -50,11 +50,11 @@ index d4eae29..e41f5e3 100644
  CONFIG_PTP_1588_CLOCK_OPTIONAL=y
  CONFIG_QUEUED_RWLOCKS=y
  CONFIG_QUEUED_SPINLOCKS=y
-diff --git a/target/linux/bcm4908/patches-6.18/098-arm64-dts-broadcom-bcmbca-rt-ac86u-free-misc3-for-crash-records.patch b/target/linux/bcm4908/patches-6.18/098-arm64-dts-broadcom-bcmbca-rt-ac86u-free-misc3-for-crash-records.patch
+diff --git a/target/linux/bcm4908/patches-6.18/316-arm64-dts-broadcom-bcmbca-rt-ac86u-free-misc3-for-crash-records.patch b/target/linux/bcm4908/patches-6.18/316-arm64-dts-broadcom-bcmbca-rt-ac86u-free-misc3-for-crash-records.patch
 new file mode 100644
 index 0000000..0aba5f2
 --- /dev/null
-+++ b/target/linux/bcm4908/patches-6.18/098-arm64-dts-broadcom-bcmbca-rt-ac86u-free-misc3-for-crash-records.patch
++++ b/target/linux/bcm4908/patches-6.18/316-arm64-dts-broadcom-bcmbca-rt-ac86u-free-misc3-for-crash-records.patch
 @@ -0,0 +1,18 @@
 +From: Daaboulex <39669593+Daaboulex@users.noreply.github.com>
 +Subject: [PATCH] arm64: dts: broadcom: bcmbca: rt-ac86u: free misc3 for crash records

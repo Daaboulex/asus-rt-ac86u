@@ -1,8 +1,8 @@
-diff --git a/target/linux/bcm4908/patches-6.18/090-dt-bindings-arm-bcmbca-add-ASUS-RT-AC86U.patch b/target/linux/bcm4908/patches-6.18/090-dt-bindings-arm-bcmbca-add-ASUS-RT-AC86U.patch
+diff --git a/target/linux/bcm4908/patches-6.18/310-dt-bindings-arm-bcmbca-add-ASUS-RT-AC86U.patch b/target/linux/bcm4908/patches-6.18/310-dt-bindings-arm-bcmbca-add-ASUS-RT-AC86U.patch
 new file mode 100644
 index 0000000..b9f5e35
 --- /dev/null
-+++ b/target/linux/bcm4908/patches-6.18/090-dt-bindings-arm-bcmbca-add-ASUS-RT-AC86U.patch
++++ b/target/linux/bcm4908/patches-6.18/310-dt-bindings-arm-bcmbca-add-ASUS-RT-AC86U.patch
 @@ -0,0 +1,16 @@
 +From: Daaboulex <39669593+Daaboulex@users.noreply.github.com>
 +Subject: [PATCH] dt-bindings: arm: bcmbca: add ASUS RT-AC86U
@@ -20,11 +20,11 @@ index 0000000..b9f5e35
 +               - netgear,r8000p
 +               - tplink,archer-c2300-v1
 +               - zyxel,ex3510b
-diff --git a/target/linux/bcm4908/patches-6.18/091-arm64-dts-broadcom-bcmbca-add-ASUS-RT-AC86U.patch b/target/linux/bcm4908/patches-6.18/091-arm64-dts-broadcom-bcmbca-add-ASUS-RT-AC86U.patch
+diff --git a/target/linux/bcm4908/patches-6.18/311-arm64-dts-broadcom-bcmbca-add-ASUS-RT-AC86U.patch b/target/linux/bcm4908/patches-6.18/311-arm64-dts-broadcom-bcmbca-add-ASUS-RT-AC86U.patch
 new file mode 100644
 index 0000000..8f169e4
 --- /dev/null
-+++ b/target/linux/bcm4908/patches-6.18/091-arm64-dts-broadcom-bcmbca-add-ASUS-RT-AC86U.patch
++++ b/target/linux/bcm4908/patches-6.18/311-arm64-dts-broadcom-bcmbca-add-ASUS-RT-AC86U.patch
 @@ -0,0 +1,177 @@
 +From: Daaboulex <39669593+Daaboulex@users.noreply.github.com>
 +Subject: [PATCH] arm64: dts: broadcom: bcmbca: add ASUS RT-AC86U
