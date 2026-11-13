@@ -33,9 +33,19 @@ the line says so.
   firmware's `txpwr_target_max`. The image ships `iw-full` for that
   reading, and `test_configured_transmit_power_caps_every_chain` fails
   when any chain's target exceeds the configured transmit power.
+- The access points run WPA2 only. In Linux 6.18.62 an access point gets
+  WPA3 (SAE) only through firmware offload, which `brcmfmac` enables when
+  the firmware reports both `idauth` and `sae`; it has no user-space SAE
+  for access points. On firmware 10.28.2 `iw phy` lists neither SAE
+  offload nor the access point handshake offload that `idauth` brings.
 - A radar (DFS) channel cannot carry an access point. `brcmfmac` announces
   DFS offload but never reports the channel availability check starting or
   finishing, so hostapd waits for it and never starts the access point.
+  In Linux 6.18.62, `brcmfmac` sets `NL80211_EXT_FEATURE_DFS_OFFLOAD`
+  whenever the firmware has 802.11h, calls neither `cfg80211_cac_event`
+  nor `cfg80211_radar_event`, and leaves the firmware's `DFS_AP_STOP` and
+  `DFS_AP_RESUME` events unhandled. Marking the check done in hostapd
+  instead would transmit on a radar channel without proof of the check.
   `test_access_point_starts_on_a_radar_channel` is expected to fail, and
   fails the suite the day it passes.
 - Routing runs on the CPU: OpenWrt has no hardware NAT offload for this SoC.
@@ -70,8 +80,8 @@ the line says so.
 
 ## Measured on the unit
 
-Each figure names how it was taken, on 2026-11-12, with both radios capped
-at 9 dBm per chain.
+Each figure names how it was taken, on 2026-11-12 and 13, with both
+radios capped at 9 dBm per chain.
 
 - Wi-Fi link to a phone, from `iw dev <ap> station dump`: 975 to
   1083 Mbit/s on 5 GHz at 80 MHz with -44 to -49 dBm of signal, and 520 to
@@ -90,7 +100,20 @@ at 9 dBm per chain.
   `linklayer ethernet` and `overhead 34`, held it at 15 to 16 ms, 28 ms at
   worst, for about 12 % less upload throughput. A saturating download
   raised the ping by about 13 ms unshaped, so the download is left
-  unshaped.
+  unshaped. Routed through the router's NAT from a laptop on its 5 GHz,
+  a saturating upload kept the ping at 16.7 ms on average against 16.9 ms
+  idle, so the shaping holds for forwarded traffic too.
+- Wi-Fi to the router itself, from a laptop on 5 GHz at -45 dBm with an
+  866 Mbit/s link, `iperf3 -P 4` against `iperf3 -s` on the router: 644
+  Mbit/s from the laptop and 544 Mbit/s to it, with both cores about 60 %
+  busy. Moving the 5 GHz radio's interrupt to core 1
+  (`/proc/irq/23/smp_affinity` 2) dropped the upload to 477 Mbit/s with
+  core 1 at 96 %, so the interrupts stay where the kernel puts them.
+- Routing load: 164 to 200 Mbit/s of download through NAT from that
+  laptop kept the router about 30 % busy, and software flow offload
+  (`flow_offloading` 1) changed neither the rate nor the load, so it
+  stays off. No wired client has measured routing above the internet
+  line yet.
 
 ## The ways back in
 
