@@ -1,0 +1,90 @@
+diff --git a/package/kernel/mac80211/Makefile b/package/kernel/mac80211/Makefile
+index 8fbe002..27d1dd7 100644
+--- a/package/kernel/mac80211/Makefile
++++ b/package/kernel/mac80211/Makefile
+@@ -12,7 +12,7 @@ PKG_NAME:=mac80211
+ 
+ PKG_SOURCE_VERSION:=7.2
+ PKG_VERSION:=$(subst -,_,$(PKG_SOURCE_VERSION))
+-PKG_RELEASE:=17
++PKG_RELEASE:=18
+ PKG_LICENSE:=GPL-2.0-only
+ PKG_LICENSE_FILES:=COPYING
+ 
+diff --git a/package/kernel/mac80211/patches/brcm/888-wifi-brcmfmac-size-the-station-info-buffer-for-version-8.patch b/package/kernel/mac80211/patches/brcm/888-wifi-brcmfmac-size-the-station-info-buffer-for-version-8.patch
+new file mode 100644
+index 0000000..8a04516
+--- /dev/null
++++ b/package/kernel/mac80211/patches/brcm/888-wifi-brcmfmac-size-the-station-info-buffer-for-version-8.patch
+@@ -0,0 +1,71 @@
++From: Daaboulex <39669593+Daaboulex@users.noreply.github.com>
++Subject: [PATCH] wifi: brcmfmac: size the station info buffer for version 8
++
++Firmware that reports station info version 8, BCM4366 firmware
++10.10.131.81 among it, fills in the statistics only when the host
++buffer holds the whole version 8 record. struct brcmf_sta_info_le ends
++with the version 7 layout, 296 bytes, so the firmware answers with the
++84 byte header, leaves BRCMF_STA_SCBSTATS clear, and get_station
++reports no signal, bitrate, packet or byte counts for any station.
++
++Version 8 keeps every field brcmfmac reads at its version 7 offset; it
++turns the 16-bit wpauth into padding and appends fields after wnm_cap,
++352 bytes in all. Describe that layout so the buffer covers it.
++
++---
++--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/fwil_types.h
+++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/fwil_types.h
++@@ -174,6 +174,10 @@
++ 
++ #define BRCMF_HE_CAP_MCS_MAP_NSS_MAX	8
++ 
+++#define BRCMF_STA_VENDOR_OUI_MAX	6
+++
+++#define BRCMF_RRM_CAP_LEN		5
+++
++ #define BRCMF_PMKSA_VER_2		2
++ #define BRCMF_PMKSA_VER_3		3
++ #define BRCMF_PMKSA_NO_EXPIRY		0xffffffff
++@@ -702,6 +706,42 @@
++ 			__le32 rx_rspec;	/* Rate of last successful rx frame */
++ 			__le32 wnm_cap;		/* wnm capabilities */
++ 		} v7;
+++
+++		struct {
+++			__le32 rx_dur_total;	/* total user RX duration (estimated) */
+++			__le16 chanspec;	/** chanspec this sta is on */
+++			__le16 pad_1;
+++			struct {
+++				__le16 version;					/* version */
+++				__le16 len;					/* length */
+++				__le32 count;					/* # rates in this set */
+++				u8 rates[BRCMF_MAXRATES_IN_SET];		/* rates in 500kbps units w/hi bit set if basic */
+++				u8 mcs[BRCMF_MCSSET_LEN];			/* supported mcs index bit map */
+++				__le16 vht_mcs[BRCMF_VHT_CAP_MCS_MAP_NSS_MAX];	/* supported mcs index bit map per nss */
+++				__le16 he_mcs[BRCMF_HE_CAP_MCS_MAP_NSS_MAX];	/* supported he mcs index bit map per nss */
+++			} rateset_adv;		/* rateset along with mcs index bitmap */
+++			__le16 pad_2;
+++			u8 algo;		/* crypto algorithm */
+++			u8 pad_3;
+++			__le32 tx_rspec;	/* Rate of last successful tx frame */
+++			__le32 rx_rspec;	/* Rate of last successful rx frame */
+++			__le32 wnm_cap;		/* wnm capabilities */
+++			__le32 he_flags;	/* converted he flags */
+++			u8 vendor_oui_count;	/* # vendor OUIs in vendor_oui */
+++			u8 vendor_oui[BRCMF_STA_VENDOR_OUI_MAX][3];	/* vendor OUIs the sta advertised */
+++			u8 link_bw;		/* link bandwidth */
+++			__le32 wpauth;		/* authentication type */
+++			s8 srssi;		/* smoothed rssi */
+++			u8 twt_info;		/* target wake time info */
+++			__le16 he_omi;		/* he operating mode indication */
+++			__le32 tx_mgmt_pkts;	/* # of management frames sent */
+++			__le32 tx_ctl_pkts;	/* # of control frames sent */
+++			__le32 rx_mgmt_pkts;	/* # of management frames received */
+++			__le32 rx_ctl_pkts;	/* # of control frames received */
+++			u8 rrm_capabilities[BRCMF_RRM_CAP_LEN];	/* rrm capabilities of the sta */
+++			u8 pad_4;
+++			__le16 map_flags;	/* multi-ap flags */
+++		} v8;
++ 	};
++ };
++ 

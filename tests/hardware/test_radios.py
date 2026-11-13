@@ -99,6 +99,21 @@ def test_channel_survey_reports_each_channels_own_noise(router):
     assert len(set(noise)) > 1, noise
 
 
+def test_station_dump_carries_signal_rates_and_counters(router):
+    checked = []
+    for ap in access_points(router):
+        interface = ap.removeprefix("hostapd.")
+        dump = router.run(f"iw dev {interface} station dump")
+        for block in re.split(r"(?m)^(?=Station )", dump):
+            if not block.startswith("Station "):
+                continue
+            for field in ("signal:", "tx bitrate:", "rx bitrate:", "rx bytes:", "tx packets:"):
+                assert field in block, f"{interface}: no {field!r} in\n{block}"
+            checked.append(interface)
+    if not checked:
+        pytest.skip("no station is associated")
+
+
 def test_radios_take_msi_interrupts(router):
     lines = [
         line
