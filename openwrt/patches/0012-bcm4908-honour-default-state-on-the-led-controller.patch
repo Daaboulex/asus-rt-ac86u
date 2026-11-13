@@ -3,7 +3,7 @@ new file mode 100644
 index 0000000..06ac39e
 --- /dev/null
 +++ b/target/linux/bcm4908/patches-6.18/096-leds-bcm63138-honour-default-state.patch
-@@ -0,0 +1,31 @@
+@@ -0,0 +1,44 @@
 +From: Daaboulex <39669593+Daaboulex@users.noreply.github.com>
 +Subject: [PATCH] leds: bcm63138: honour default-state
 +
@@ -13,10 +13,14 @@ index 0000000..06ac39e
 +default-state before registering: "on" starts at full brightness and
 +"keep" takes the state the LED is in, from the software data register.
 +
++Program the starting brightness through bcm63138_leds_brightness_set(),
++so an LED that starts on also gets its brightness level, not only its
++bit in the software data register.
++
 +---
 +--- a/drivers/leds/blink/leds-bcm63138.c
 ++++ b/drivers/leds/blink/leds-bcm63138.c
-+@@ -224,6 +224,18 @@
++@@ -224,6 +224,18 @@ static void bcm63138_leds_create_led(struct bcm63138_leds *leds,
 + 
 + 	led->active_low = of_property_read_bool(np, "active-low");
 + 
@@ -35,3 +39,12 @@ index 0000000..06ac39e
 + 	led->cdev.max_brightness = BCM63138_MAX_BRIGHTNESS;
 + 	led->cdev.brightness_set = bcm63138_leds_brightness_set;
 + 	led->cdev.blink_set = bcm63138_leds_blink_set;
++@@ -245,7 +257,7 @@ static void bcm63138_leds_create_led(struct bcm63138_leds *leds,
++ 				  led->active_low ? 0 : bit);
++ 	bcm63138_leds_update_bits(leds, BCM63138_HW_LED_EN, bit, 0);
++ 	bcm63138_leds_set_flash_rate(leds, led, 0);
++-	bcm63138_leds_enable_led(leds, led, led->cdev.brightness);
+++	bcm63138_leds_brightness_set(&led->cdev, led->cdev.brightness);
++ 
++ 	return;
++ 
