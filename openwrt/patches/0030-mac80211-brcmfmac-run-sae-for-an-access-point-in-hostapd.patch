@@ -1,0 +1,193 @@
+diff --git a/package/kernel/mac80211/Makefile b/package/kernel/mac80211/Makefile
+index 19e7c57..eb01ab4 100644
+--- a/package/kernel/mac80211/Makefile
++++ b/package/kernel/mac80211/Makefile
+@@ -12,7 +12,7 @@ PKG_NAME:=mac80211
+ 
+ PKG_SOURCE_VERSION:=7.2
+ PKG_VERSION:=$(subst -,_,$(PKG_SOURCE_VERSION))
+-PKG_RELEASE:=15
++PKG_RELEASE:=16
+ PKG_LICENSE:=GPL-2.0-only
+ PKG_LICENSE_FILES:=COPYING
+ 
+diff --git a/package/kernel/mac80211/patches/brcm/886-wifi-brcmfmac-bca-run-SAE-for-an-access-point-in-hostapd.patch b/package/kernel/mac80211/patches/brcm/886-wifi-brcmfmac-bca-run-SAE-for-an-access-point-in-hostapd.patch
+new file mode 100644
+index 0000000..cbd7cc9
+--- /dev/null
++++ b/package/kernel/mac80211/patches/brcm/886-wifi-brcmfmac-bca-run-SAE-for-an-access-point-in-hostapd.patch
+@@ -0,0 +1,174 @@
++From: Daaboulex <39669593+Daaboulex@users.noreply.github.com>
++Subject: [PATCH] wifi: brcmfmac: bca: run SAE for an access point in hostapd
++
++Broadcom's BCA firmware for router chips that lists the sae capability,
++4366c0 10.10.131.81 among them, keeps association for itself but hands
++an SAE Authentication frame to the host as a WLC_E_AUTH event carrying
++the frame body, and sends the host's reply given whole through the
++WLC_SCB_AUTHENTICATE ioctl. It has no idauth, so it offers no SAE
++offload; the vendor layer dropped SAE for BCA altogether.
++
++Run SAE in hostapd instead: report SAE as handled in the host
++(SAE_EXT), pass SAE Authentication frames on an access point up with
++cfg80211_rx_mgmt(), send Authentication frames from hostapd down
++through WLC_SCB_AUTHENTICATE, and declare the SAE AKM for access
++points. Association and the 4-way handshake stay as for WPA2-PSK.
++
++---
++--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/bca/core.c
+++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/bca/core.c
++@@ -4,19 +4,28 @@
++  */
++ #include <linux/errno.h>
++ #include <linux/types.h>
+++#include <linux/unaligned.h>
+++#include <net/cfg80211.h>
++ #include <core.h>
++ #include <bus.h>
++ #include <fwvid.h>
++ #include <feature.h>
+++#include <fwil.h>
+++#include <fweh.h>
+++#include <cfg80211.h>
++ 
++ #include "vops.h"
++ 
++ #define BRCMF_BCA_E_LAST		212
+++#define BRCMF_BCA_AUTH_FIXED_LEN	6
++ 
++ static void brcmf_bca_feat_attach(struct brcmf_if *ifp)
++ {
++-	/* SAE support not confirmed so disabling for now */
++-	ifp->drvr->feat_flags &= ~BIT(BRCMF_FEAT_SAE);
+++	struct brcmf_pub *drvr = ifp->drvr;
+++
+++	if (drvr->feat_flags & BIT(BRCMF_FEAT_SAE))
+++		drvr->feat_flags |= BIT(BRCMF_FEAT_SAE_EXT);
+++	drvr->feat_flags &= ~BIT(BRCMF_FEAT_SAE);
++ }
++ 
++ static int brcmf_bca_alloc_fweh_info(struct brcmf_pub *drvr)
++@@ -32,7 +41,99 @@
++ 	return 0;
++ }
++ 
+++static int brcmf_bca_mgmt_tx(struct wiphy *wiphy, struct wireless_dev *wdev,
+++			     struct cfg80211_mgmt_tx_params *params,
+++			     u64 *cookie)
+++{
+++	const struct ieee80211_mgmt *mgmt = (const void *)params->buf;
+++	struct brcmf_cfg80211_vif *vif;
+++	bool ack;
+++	void *frame;
+++	int err;
+++
+++	if (wdev->iftype != NL80211_IFTYPE_AP ||
+++	    params->len < offsetof(struct ieee80211_mgmt, u) ||
+++	    !ieee80211_is_auth(mgmt->frame_control))
+++		return brcmf_cfg80211_mgmt_tx(wiphy, wdev, params, cookie);
+++
+++	vif = container_of(wdev, struct brcmf_cfg80211_vif, wdev);
+++	frame = kmemdup(params->buf, params->len, GFP_KERNEL);
+++	if (!frame)
+++		return -ENOMEM;
+++
+++	*cookie = 0;
+++	err = brcmf_fil_cmd_data_set(vif->ifp, BRCMF_C_SCB_AUTHENTICATE, frame,
+++				     params->len);
+++	kfree(frame);
+++	ack = !err;
+++	if (err)
+++		bphy_err(vif->ifp->drvr, "auth frame to %pM refused: %d\n",
+++			 mgmt->da, err);
+++	cfg80211_mgmt_tx_status(wdev, *cookie, params->buf, params->len, ack,
+++				GFP_KERNEL);
+++	return err;
+++}
+++
+++static void brcmf_bca_get_cfg80211_ops(struct brcmf_pub *drvr)
+++{
+++	drvr->ops->mgmt_tx = brcmf_bca_mgmt_tx;
+++}
+++
+++static s32 brcmf_bca_notify_auth(struct brcmf_if *ifp,
+++				 const struct brcmf_event_msg *e, void *data)
+++{
+++	struct brcmf_cfg80211_info *cfg = ifp->drvr->config;
+++	struct ieee80211_mgmt *mgmt;
+++	struct brcmu_chan ch;
+++	u32 chanspec;
+++	size_t len;
+++	int freq;
+++	s32 err;
+++
+++	if (!ifp->vif || ifp->vif->wdev.iftype != NL80211_IFTYPE_AP)
+++		return 0;
+++	if (e->datalen < BRCMF_BCA_AUTH_FIXED_LEN ||
+++	    get_unaligned_le16(data) != WLAN_AUTH_SAE)
+++		return 0;
+++
+++	err = brcmf_fil_iovar_int_get(ifp, "chanspec", &chanspec);
+++	if (err) {
+++		bphy_err(ifp->drvr, "no channel for auth frame from %pM: %d\n",
+++			 e->addr, err);
+++		return err;
+++	}
+++	ch.chspec = chanspec;
+++	cfg->d11inf.decchspec(&ch);
+++	freq = ieee80211_channel_to_frequency(ch.control_ch_num,
+++					      ch.band == BRCMU_CHAN_BAND_2G ?
+++					      NL80211_BAND_2GHZ :
+++					      NL80211_BAND_5GHZ);
+++
+++	len = offsetof(struct ieee80211_mgmt, u) + e->datalen;
+++	mgmt = kzalloc(len, GFP_KERNEL);
+++	if (!mgmt)
+++		return -ENOMEM;
+++
+++	mgmt->frame_control = cpu_to_le16(IEEE80211_FTYPE_MGMT |
+++					  IEEE80211_STYPE_AUTH);
+++	memcpy(mgmt->da, ifp->mac_addr, ETH_ALEN);
+++	memcpy(mgmt->sa, e->addr, ETH_ALEN);
+++	memcpy(mgmt->bssid, ifp->mac_addr, ETH_ALEN);
+++	memcpy(&mgmt->u, data, e->datalen);
+++
+++	cfg80211_rx_mgmt(&ifp->vif->wdev, freq, 0, (u8 *)mgmt, len, 0);
+++	kfree(mgmt);
+++	return 0;
+++}
+++
+++static void brcmf_bca_register_event_handlers(struct brcmf_pub *drvr)
+++{
+++	brcmf_fweh_register(drvr, BRCMF_E_AUTH, brcmf_bca_notify_auth);
+++}
+++
++ const struct brcmf_fwvid_ops brcmf_bca_ops = {
++ 	.feat_attach = brcmf_bca_feat_attach,
++ 	.alloc_fweh_info = brcmf_bca_alloc_fweh_info,
+++	.get_cfg80211_ops = brcmf_bca_get_cfg80211_ops,
+++	.register_event_handlers = brcmf_bca_register_event_handlers,
++ };
++--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/fwil.h
+++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/fwil.h
++@@ -80,6 +80,7 @@
++ #define BRCMF_C_GET_VAR				262
++ #define BRCMF_C_SET_VAR				263
++ #define BRCMF_C_SET_WSEC_PMK			268
+++#define BRCMF_C_SCB_AUTHENTICATE		325
++ 
++ s32 brcmf_fil_cmd_data_set(struct brcmf_if *ifp, u32 cmd, void *data, u32 len);
++ s32 brcmf_fil_cmd_data_get(struct brcmf_if *ifp, u32 cmd, void *data, u32 len);
++--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.c
+++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.c
++@@ -7820,8 +7820,9 @@
++ 			wiphy_ext_feature_set(wiphy,
++ 					      NL80211_EXT_FEATURE_SAE_OFFLOAD_AP);
++ 	}
++-	if (brcmf_feat_is_enabled(ifp, BRCMF_FEAT_FWAUTH) &&
++-	    brcmf_feat_is_enabled(ifp, BRCMF_FEAT_SAE)) {
+++	if ((brcmf_feat_is_enabled(ifp, BRCMF_FEAT_FWAUTH) &&
+++	     brcmf_feat_is_enabled(ifp, BRCMF_FEAT_SAE)) ||
+++	    brcmf_feat_is_enabled(ifp, BRCMF_FEAT_SAE_EXT)) {
++ 		wiphy->iftype_akm_suites = brcmf_iftype_akm_suites_sae;
++ 		wiphy->num_iftype_akm_suites = ARRAY_SIZE(brcmf_iftype_akm_suites_sae);
++ 	} else {
