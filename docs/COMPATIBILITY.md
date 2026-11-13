@@ -61,9 +61,15 @@ the line says so.
   fails the suite the day it passes.
 - Routing runs on the CPU: OpenWrt has no hardware NAT offload for this SoC.
   No test in this repository measures throughput.
-- USB 3 storage reads slowly: an NVMe enclosure linked at 5 Gbit/s under
-  `uas` read 37 to 42 MB/s with `dd`, direct or cached, while both cores
-  stayed nearly idle (2026-11-12). The cause is not known.
+- USB 3 storage reads slowly: an NVMe drive in an RTL9210 enclosure,
+  linked at 5 Gbit/s under `uas`, read 35 to 44 MB/s with `dd` from the
+  start of the drive, direct or cached, with the busy core waiting on
+  I/O, not computing (2026-11-12 and 13). Deeper into the drive, `dd
+  iflag=direct` reached 73 MB/s with 512 KiB requests and 78 MB/s with
+  4 MiB, and a 4 KiB request took 0.17 ms. ASUS's firmware was reviewed
+  at about 104 MB/s of USB 3 reads on this model. Under `usb-storage`
+  instead of `uas` the enclosure failed `Read Capacity`. The cause is not
+  known; the same drive has not been read on another host.
 - A change rolled back by `uci apply` is restored in RAM first and reaches
   flash with the kernel's write-back, up to about 35 s later
   (`dirty_expire_centisecs` 3000, `dirty_writeback_centisecs` 500). On
@@ -131,6 +137,15 @@ radios capped at 9 dBm per chain.
   (`flow_offloading` 1) changed neither the rate nor the load, so it
   stays off. No wired client has measured routing above the internet
   line yet.
+- WireGuard on the two cores, with both ends of the tunnel on the router
+  (2026-11-13): two `wireguard` interfaces made in the main namespace,
+  so their UDP sockets stay there on loopback, were moved into two
+  network namespaces, and `iperf3` ran between those for 15 s. One TCP
+  stream carried 589 Mbit/s and two carried 559 Mbit/s, with both cores
+  near 100 %. Each packet is encrypted and decrypted on the same router
+  here, so a tunnel with one end on it has more headroom. Cake on the
+  sending side cut two streams to 367 Mbit/s when set to 2 Gbit/s, and
+  held them at 193 Mbit/s when set to 200 Mbit/s.
 
 ## The ways back in
 
