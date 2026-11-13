@@ -93,7 +93,7 @@ Three switches open the tests that need more than a look:
   A transmit power of 9 dBm on each radio keeps them within those limits.
 - A radar (DFS) channel cannot carry an access point.
 - There is no hardware NAT offload; routing runs on the CPU.
-- The router reports no temperatures.
+- The radios report no temperature. The CPU does.
 - Rescue mode answers on a LAN port only, and serves no web page.
 - A kernel module cannot be installed from OpenWrt's package feed. The image
   carries WireGuard, the cake shaper, `qosify` traffic priority, UPnP and

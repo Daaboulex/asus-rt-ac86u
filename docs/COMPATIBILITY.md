@@ -41,7 +41,8 @@ the line says so.
   request and sends it to the firmware when the interface comes up. With
   it, the test passed after a fresh boot on 2026-11-13, every chain of
   both radios read 9 dBm, and the boot log held no such error.
-- The access points run WPA2 only. In Linux 6.18.62 an access point gets
+- The access points run WPA2 with optional protected management frames, not
+  WPA3. In Linux 6.18.62 an access point gets
   WPA3 (SAE) only through firmware offload, which `brcmfmac` enables when
   the firmware reports both `idauth` and `sae`; it has no user-space SAE
   for access points. On firmware 10.28.2 `iw phy` lists neither SAE
@@ -52,13 +53,29 @@ the line says so.
   image ships no hostapd, its `nas` and `eapd` authenticators hold no SAE
   code, and its `rc` never declares the `wpa3` capability its web pages
   check for. This was read from the image's files on 2026-11-13, not by
-  running it.
-- Protected management frames (802.11w) break the access point. With
-  `ieee80211w '1'` the firmware's beacons still carry its own RSN element
-  while hostapd sends its own, with the PMF bits, in the handshake. On
-  2026-11-13 a client failed the handshake with reason 17 (the element
-  differs), with its own PMF on or off, and phones reported a wrong
-  password.
+  running it. No public firmware for the chip carries SAE either. On
+  2026-11-13 the 4366c0 builds in linux-firmware (10.28.2, 2018), Netgear
+  R8000P 1.4.4.94 (10.10.131.34, 2021) and TP-Link Archer C2300 V1 2.2.1
+  (10.10.122.308, built 2025-09-25) all lacked the `sae` build tag. The
+  Archer C2300 V2, whose notes mention WPA3, is a MediaTek design. Asked
+  for WPA2/WPA3 mixed, hostapd started and the firmware's beacon offered
+  only PSK-SHA256. Since repo patches 0027 to 0029 the radios declare the
+  AKMs they offer, and the wifi scripts refuse such a network with
+  `AKM_NOT_SUPPORTED` instead of starting one no client can join.
+- Protected management frames (802.11w) work, optional, on every network.
+  The firmware builds the RSN element of beacons and probe responses
+  itself from what brcmfmac passes, hostapd sends its own in message 3 of
+  the 4-way handshake, and a client aborts with reason 17 when the two
+  differ by a byte, which phones report as a wrong password. A handshake
+  trace on 2026-11-13 showed two differences. hostapd left out the
+  BIP-CMAC-128 management cipher field the firmware always writes, which
+  hostapd patch `990-AP-write-the-default-management-group-cipher-into-the-RSNE`
+  now writes. Given PSK and PSK-SHA256 with PMF, the firmware advertises
+  only PSK-SHA256, so brcmfmac patch
+  `885-wifi-brcmfmac-report-the-AKM-suites-an-access-point-offers`
+  declares the AKMs the firmware advertises as given and the wifi scripts
+  offer WPA-PSK alone. A Linux client then joined with `MFP:yes`, and with
+  its own PMF off with `MFP:no`.
 - Each access point takes an address the scripts derive from the radio's
   own one, and a rebuild that re-adds only one of a radio's networks can
   hand the networks each other's addresses. A bridge address must lie
@@ -112,8 +129,17 @@ the line says so.
   (`dirty_expire_centisecs` 3000, `dirty_writeback_centisecs` 500). On
   2026-11-12 a deliberate panic 31 s after a rollback brought the rejected
   firewall rule back at the next boot.
-- The unit reports no temperatures: Linux has no thermal driver for the
-  BCM4908. No test in this repository checks it.
+- The CPU temperature comes from a sensor in the CPU cluster's
+  configuration block, register 0x810621a0. The vendor's GPL thermal
+  driver reads its low 10 bits as (4133500 - 4906 * raw) / 10
+  millidegrees, and patch
+  `105-thermal-broadcom-add-a-bcm4908-thermal-sensor-driver` reports it
+  the same way, as the thermal zone `cpu-thermal`, also shown in hwmon as
+  `cpu_thermal`, which LuCI's dashboard files under CPU. On 2026-11-13 it
+  read 66.0 C idle, 69.4 C after 10 s and 71.4 C after 60 s on all four
+  cores, and 66.0 C again a minute later
+  (`test_cpu_temperature_rises_under_load`). The radios report no
+  temperature.
 - A crash log cannot live in RAM, because the unit's RAM does not survive a
   reset; the measurement is under "Hardware facts" in
   [`DESIGN.md`](./DESIGN.md). The kernel keeps its panic records in flash, on

@@ -10,7 +10,10 @@ building, checks and updates are in [`DEVELOPMENT.md`](./DEVELOPMENT.md).
 ## Principles
 
 - Every change is a patch to the pinned OpenWrt tree, in the place and form
-  upstream expects, so each one can be sent upstream unchanged.
+  upstream expects. The series stays in this repository until the port is
+  finished (owner, 2026-11-13). Sending a patch upstream then still needs
+  its own commit message and a Signed-off-by, which the series does not
+  carry.
 - Each patch has one job and names where it is meant to land: Linux, the
   `bcm63xx-cfe` repo, or OpenWrt. When upstream takes it, the copy here is
   dropped. The build and the flake check stop on a patch that applies in
