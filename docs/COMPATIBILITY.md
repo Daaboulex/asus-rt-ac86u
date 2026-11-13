@@ -41,27 +41,36 @@ the line says so.
   request and sends it to the firmware when the interface comes up. With
   it, the test passed after a fresh boot on 2026-11-13, every chain of
   both radios read 9 dBm, and the boot log held no such error.
-- The access points run WPA2 with optional protected management frames, not
-  WPA3. In Linux 6.18.62 an access point gets
-  WPA3 (SAE) only through firmware offload, which `brcmfmac` enables when
-  the firmware reports both `idauth` and `sae`; it has no user-space SAE
-  for access points. On firmware 10.28.2 `iw phy` lists neither SAE
-  offload nor the access point handshake offload that `idauth` brings.
-  ASUS's own firmware does not offer WPA3 on this model either. Its
-  newest radio firmware, 10.10.122.20 inside `dhd.ko` of release
-  3.0.0.4.386.52334, carries `mfp` but not `sae` among its build tags. The
-  image ships no hostapd, its `nas` and `eapd` authenticators hold no SAE
-  code, and its `rc` never declares the `wpa3` capability its web pages
-  check for. This was read from the image's files on 2026-11-13, not by
-  running it. No public firmware for the chip carries SAE either. On
-  2026-11-13 the 4366c0 builds in linux-firmware (10.28.2, 2018), Netgear
-  R8000P 1.4.4.94 (10.10.131.34, 2021) and TP-Link Archer C2300 V1 2.2.1
-  (10.10.122.308, built 2025-09-25) all lacked the `sae` build tag. The
-  Archer C2300 V2, whose notes mention WPA3, is a MediaTek design. Asked
-  for WPA2/WPA3 mixed, hostapd started and the firmware's beacon offered
-  only PSK-SHA256. Since repo patches 0027 to 0029 the radios declare the
-  AKMs they offer, and the wifi scripts refuse such a network with
-  `AKM_NOT_SUPPORTED` instead of starting one no client can join.
+- The image's radio firmware, 10.28.2 from linux-firmware, offers WPA2 with
+  optional protected management frames, not WPA3: it has no SAE and no
+  path for SAE frames, and in Linux 6.18 `brcmfmac` gives an access point
+  SAE only through firmware offload (`idauth` and `sae`), which no 4366c0
+  firmware has. ASUS's own firmware does not offer WPA3 on this model
+  either; its radio firmware 10.10.122.20 lacks the `sae` tag. Asked for
+  WPA2/WPA3 mixed on 10.28.2, the wifi scripts refuse the network with
+  `AKM_NOT_SUPPORTED` (patches 0027 to 0029).
+- WPA3-Personal works with firmware 10.10.131.81 (r796181, 2021), the
+  4366c0 build of Broadcom's AX SDK in the asuswrt-merlin.ng GPL tree
+  (`impl69/sys/src/dongle/bin/4366c0/rtecdc.bin`), which the image does
+  not ship yet. That firmware hands each received SAE Authentication frame
+  to the host as a `WLC_E_AUTH` event and sends the host's reply through
+  `WLC_SCB_AUTHENTICATE`; brcmfmac patch 886 routes both to and from
+  hostapd, which runs SAE itself. The firmware also sets the
+  host-assisted LLC/SNAP flag, and without patch 887 every frame it sends,
+  EAPOL included, left with a broken header. On 2026-11-13 an ath12k
+  laptop and an Android phone joined the WPA2/WPA3 mixed 5 GHz network
+  with SAE (`auth_alg=sae`, MFP on) and WPA2 clients joined the same
+  network. SAE runs hunting-and-pecking only: 10.10.131.81 has no `rsnxe`
+  iovar, refuses element 244 through its `ie` iovar and rewrites it to a
+  vendor element through `vndr_ie`, so the beacon cannot announce
+  hash-to-element and `sae_pwe` must be 0. Firmware 10.10.131.116
+  (r811008, 2024, Zyxel DX5401-B0 GPL) has the `rsnxe` iovar, and with
+  patch 889 its beacons carried the element hostapd built; but on it SAE
+  itself failed for both methods on 2026-11-13, so it is not used. Beacon
+  protection (BIGTK) and Transition Disable are in no 4366c0 firmware
+  found. An Apple laptop under Asahi Linux (BCM4387) failed SAE against
+  this access point and against a Vodafone EasyBox alike; its firmware's
+  SAE offload under wpa_supplicant is a known Asahi limit.
 - Protected management frames (802.11w) work, optional, on every network.
   The firmware builds the RSN element of beacons and probe responses
   itself from what brcmfmac passes, hostapd sends its own in message 3 of
@@ -209,7 +218,15 @@ radios capped at 9 dBm per chain.
   restarts. A channel's noise moves by up to 20 dB between scans and
   hostapd weighs it exponentially, so a low reading can still win the
   choice for a busy channel. The survey has no record for channels 12
-  and 13, which ACS then skips.
+  and 13, which ACS then skips. Firmware 10.10.131.81 answers
+  `chanim_stats` with version 3 and the same 36-byte record per channel;
+  patch 882 reads it, and ACS there picked channels 6 and 11 on
+  2026-11-13.
+- Station statistics on firmware 10.10.131.81: its `sta_info` is version
+  8, 352 bytes, and the firmware leaves out signal, rates and counters
+  when the host's buffer is smaller. With patch 888 a laptop on 5 GHz
+  showed -48 dBm over four chains and 866.6 Mbit/s both ways in
+  `iw dev <ap> station dump` on 2026-11-13.
 - Upload lag behind an upstream modem: two parallel `curl` uploads from the
   router saturating the line raised the ping to 1.1.1.1 from about 15 ms
   to 5 s on average and 14 s at worst. Cake from `sqm-scripts` on `wan`,
