@@ -1,8 +1,16 @@
 diff --git a/target/linux/bcm4908/config-6.18 b/target/linux/bcm4908/config-6.18
-index da84c3c..0b24cb7 100644
+index da84c3c..a1f665c 100644
 --- a/target/linux/bcm4908/config-6.18
 +++ b/target/linux/bcm4908/config-6.18
-@@ -145,6 +145,7 @@ CONFIG_HAS_DMA=y
+@@ -43,6 +43,7 @@ CONFIG_ARM_PSCI_FW=y
+ CONFIG_AUDIT_ARCH_COMPAT_GENERIC=y
+ CONFIG_B53=y
+ CONFIG_BCM4908_ENET=y
++CONFIG_BCM4908_THERMAL=y
+ CONFIG_BCM7038_WDT=y
+ CONFIG_BCM7XXX_PHY=y
+ CONFIG_BCM_NET_PHYLIB=y
+@@ -145,6 +146,7 @@ CONFIG_HAS_DMA=y
  CONFIG_HAS_IOMEM=y
  CONFIG_HAS_IOPORT=y
  CONFIG_HAS_IOPORT_MAP=y
@@ -10,148 +18,207 @@ index da84c3c..0b24cb7 100644
  CONFIG_HW_RANDOM=y
  CONFIG_HW_RANDOM_IPROC_RNG200=y
  CONFIG_HZ_PERIODIC=y
-@@ -271,6 +272,7 @@ CONFIG_RESET_SIMPLE=y
- CONFIG_RFS_ACCEL=y
- CONFIG_RPS=y
- CONFIG_RWSEM_SPIN_ON_OWNER=y
-+CONFIG_SENSORS_BCM4908_TEMP=y
- # CONFIG_SERIAL_8250 is not set
- CONFIG_SERIAL_BCM63XX=y
- CONFIG_SERIAL_BCM63XX_CONSOLE=y
-diff --git a/target/linux/bcm4908/patches-6.18/104-hwmon-add-a-driver-for-the-bcm4908-cpu-temperature-sensor.patch b/target/linux/bcm4908/patches-6.18/104-hwmon-add-a-driver-for-the-bcm4908-cpu-temperature-sensor.patch
+@@ -287,6 +289,12 @@ CONFIG_SPLIT_PTE_PTLOCKS=y
+ CONFIG_SWIOTLB=y
+ CONFIG_SWPHY=y
+ CONFIG_SYSCTL_EXCEPTION_TRACE=y
++CONFIG_THERMAL=y
++CONFIG_THERMAL_DEFAULT_GOV_STEP_WISE=y
++CONFIG_THERMAL_EMERGENCY_POWEROFF_DELAY_MS=0
++CONFIG_THERMAL_GOV_STEP_WISE=y
++CONFIG_THERMAL_HWMON=y
++CONFIG_THERMAL_OF=y
+ CONFIG_THREAD_INFO_IN_TASK=y
+ CONFIG_TICK_CPU_ACCOUNTING=y
+ CONFIG_TIMER_OF=y
+diff --git a/target/linux/bcm4908/patches-6.18/104-dt-bindings-thermal-add-brcm-bcm4908-thermal.patch b/target/linux/bcm4908/patches-6.18/104-dt-bindings-thermal-add-brcm-bcm4908-thermal.patch
 new file mode 100644
-index 0000000..55ff734
+index 0000000..2e3e231
 --- /dev/null
-+++ b/target/linux/bcm4908/patches-6.18/104-hwmon-add-a-driver-for-the-bcm4908-cpu-temperature-sensor.patch
-@@ -0,0 +1,115 @@
++++ b/target/linux/bcm4908/patches-6.18/104-dt-bindings-thermal-add-brcm-bcm4908-thermal.patch
+@@ -0,0 +1,52 @@
 +From: Daaboulex <39669593+Daaboulex@users.noreply.github.com>
-+Subject: [PATCH] hwmon: add a driver for the BCM4908 CPU temperature sensor
++Subject: [PATCH] dt-bindings: thermal: add brcm,bcm4908-thermal
 +
-+The CPU cluster of the BCM4908 family carries a temperature sensor
-+whose 10-bit reading sits in the cluster's configuration block, at
-+0x810621a0. Broadcom's GPL thermal driver in vendor firmware for these
-+SoCs reads that register and converts the reading to millidegrees
-+Celsius as (4133500 - 4906 * raw) / 10. Report it the same way through
-+hwmon, so user space sees it under /sys/class/hwmon.
++The CPU cluster of the BCM4908 family carries a temperature sensor read
++from one status register in the cluster's configuration block. Describe
++it as a thermal sensor.
 +
 +---
-+--- a/drivers/hwmon/Kconfig
-++++ b/drivers/hwmon/Kconfig
-+@@ -458,6 +458,17 @@ config SENSORS_ATXP1
-+ 	  This driver can also be built as a module. If so, the module
-+ 	  will be called atxp1.
++--- /dev/null
+++++ b/Documentation/devicetree/bindings/thermal/brcm,bcm4908-thermal.yaml
++@@ -0,0 +1,41 @@
+++# SPDX-License-Identifier: GPL-2.0-only OR BSD-2-Clause
+++%YAML 1.2
+++---
+++$id: http://devicetree.org/schemas/thermal/brcm,bcm4908-thermal.yaml#
+++$schema: http://devicetree.org/meta-schemas/core.yaml#
+++
+++title: Broadcom BCM4908 thermal sensor
+++
+++maintainers:
+++  - Daaboulex <39669593+Daaboulex@users.noreply.github.com>
+++
+++description:
+++  Temperature sensor of the CPU cluster in Broadcom BCM4908 family SoCs,
+++  read from a status register in the cluster's configuration block.
+++
+++allOf:
+++  - $ref: thermal-sensor.yaml#
+++
+++properties:
+++  compatible:
+++    const: brcm,bcm4908-thermal
+++
+++  reg:
+++    maxItems: 1
+++
+++  "#thermal-sensor-cells":
+++    const: 0
+++
+++required:
+++  - compatible
+++  - reg
+++
+++unevaluatedProperties: false
+++
+++examples:
+++  - |
+++    thermal-sensor@810621a0 {
+++        compatible = "brcm,bcm4908-thermal";
+++        reg = <0x810621a0 0x4>;
+++        #thermal-sensor-cells = <0>;
+++    };
+diff --git a/target/linux/bcm4908/patches-6.18/105-thermal-broadcom-add-a-bcm4908-thermal-sensor-driver.patch b/target/linux/bcm4908/patches-6.18/105-thermal-broadcom-add-a-bcm4908-thermal-sensor-driver.patch
+new file mode 100644
+index 0000000..d893a3a
+--- /dev/null
++++ b/target/linux/bcm4908/patches-6.18/105-thermal-broadcom-add-a-bcm4908-thermal-sensor-driver.patch
+@@ -0,0 +1,109 @@
++From: Daaboulex <39669593+Daaboulex@users.noreply.github.com>
++Subject: [PATCH] thermal: broadcom: add a BCM4908 thermal sensor driver
++
++The sensor's 10-bit reading sits at 0x810621a0, in the configuration
++block of the CPU cluster. Broadcom's GPL thermal driver in vendor
++firmware for these SoCs reads it there and converts it to millidegrees
++Celsius as (4133500 - 4906 * raw) / 10. Register it as a thermal zone
++sensor with the same conversion, and add the zone to hwmon as the other
++Broadcom thermal drivers do.
++
++---
++--- a/drivers/thermal/broadcom/Kconfig
+++++ b/drivers/thermal/broadcom/Kconfig
++@@ -14,6 +14,15 @@ config BCM2835_THERMAL
++ 	help
++ 	  Support for thermal sensors on Broadcom bcm2835 SoCs.
 + 
-++config SENSORS_BCM4908_TEMP
-++	tristate "Broadcom BCM4908 CPU temperature sensor"
+++config BCM4908_THERMAL
+++	tristate "Thermal sensor on BCM4908 family SoCs"
 ++	depends on ARCH_BCMBCA || COMPILE_TEST
 ++	depends on HAS_IOMEM
+++	depends on THERMAL_OF
 ++	help
-++	  If you say yes here you get support for the temperature sensor
-++	  of the CPU cluster in Broadcom BCM4908 family SoCs.
+++	  Support for the temperature sensor of the CPU cluster in Broadcom
+++	  BCM4908 family SoCs.
 ++
-++	  This driver can also be built as a module. If so, the module
-++	  will be called bcm4908-temp.
-++
-+ config SENSORS_BT1_PVT
-+ 	tristate "Baikal-T1 Process, Voltage, Temperature sensor driver"
-+ 	depends on MIPS_BAIKAL_T1 || COMPILE_TEST
-+--- a/drivers/hwmon/Makefile
-++++ b/drivers/hwmon/Makefile
-+@@ -58,6 +58,7 @@ obj-$(CONFIG_SENSORS_ASPEED_G6) += aspeed-g6-pwm-tach.o
-+ obj-$(CONFIG_SENSORS_ASUS_ROG_RYUJIN)	+= asus_rog_ryujin.o
-+ obj-$(CONFIG_SENSORS_ATXP1)	+= atxp1.o
-+ obj-$(CONFIG_SENSORS_AXI_FAN_CONTROL) += axi-fan-control.o
-++obj-$(CONFIG_SENSORS_BCM4908_TEMP)	+= bcm4908-temp.o
-+ obj-$(CONFIG_SENSORS_BT1_PVT)	+= bt1-pvt.o
-+ obj-$(CONFIG_SENSORS_CGBC)	+= cgbc-hwmon.o
-+ obj-$(CONFIG_SENSORS_CHIPCAP2) += chipcap2.o
++ config BRCMSTB_THERMAL
++ 	tristate "Broadcom STB AVS TMON thermal driver"
++ 	depends on ARCH_BRCMSTB || COMPILE_TEST
++--- a/drivers/thermal/broadcom/Makefile
+++++ b/drivers/thermal/broadcom/Makefile
++@@ -1,6 +1,7 @@
++ # SPDX-License-Identifier: GPL-2.0-only
++ obj-$(CONFIG_BCM2711_THERMAL)		+= bcm2711_thermal.o
++ obj-$(CONFIG_BCM2835_THERMAL)		+= bcm2835_thermal.o
+++obj-$(CONFIG_BCM4908_THERMAL)		+= bcm4908_thermal.o
++ obj-$(CONFIG_BRCMSTB_THERMAL)		+= brcmstb_thermal.o
++ obj-$(CONFIG_BCM_NS_THERMAL)		+= ns-thermal.o
++ obj-$(CONFIG_BCM_SR_THERMAL)		+= sr-thermal.o
 +--- /dev/null
-++++ b/drivers/hwmon/bcm4908-temp.c
-+@@ -0,0 +1,71 @@
+++++ b/drivers/thermal/broadcom/bcm4908_thermal.c
++@@ -0,0 +1,67 @@
 ++// SPDX-License-Identifier: GPL-2.0-only
 ++
 ++#include <linux/bitfield.h>
 ++#include <linux/bits.h>
 ++#include <linux/err.h>
-++#include <linux/hwmon.h>
 ++#include <linux/io.h>
 ++#include <linux/mod_devicetable.h>
 ++#include <linux/module.h>
 ++#include <linux/platform_device.h>
+++#include <linux/thermal.h>
 ++
-++#define BCM4908_TEMP_RAW		GENMASK(9, 0)
-++#define BCM4908_TEMP_OFFSET_DECI_MC	4133500
-++#define BCM4908_TEMP_SLOPE_DECI_MC	4906
+++#include "../thermal_hwmon.h"
 ++
-++static int bcm4908_temp_read(struct device *dev, enum hwmon_sensor_types type,
-++			     u32 attr, int channel, long *val)
+++#define BCM4908_THERMAL_RAW		GENMASK(9, 0)
+++#define BCM4908_THERMAL_OFFSET_DECI_MC	4133500
+++#define BCM4908_THERMAL_SLOPE_DECI_MC	4906
+++
+++static int bcm4908_thermal_get_temp(struct thermal_zone_device *tz, int *temp)
 ++{
-++	void __iomem *reg = dev_get_drvdata(dev);
-++	long raw = FIELD_GET(BCM4908_TEMP_RAW, readl(reg));
+++	void __iomem *reg = thermal_zone_device_priv(tz);
+++	int raw = FIELD_GET(BCM4908_THERMAL_RAW, readl(reg));
 ++
-++	*val = (BCM4908_TEMP_OFFSET_DECI_MC - BCM4908_TEMP_SLOPE_DECI_MC * raw) / 10;
+++	*temp = (BCM4908_THERMAL_OFFSET_DECI_MC - BCM4908_THERMAL_SLOPE_DECI_MC * raw) / 10;
 ++	return 0;
 ++}
 ++
-++static const struct hwmon_channel_info * const bcm4908_temp_info[] = {
-++	HWMON_CHANNEL_INFO(temp, HWMON_T_INPUT),
-++	NULL
+++static const struct thermal_zone_device_ops bcm4908_thermal_ops = {
+++	.get_temp = bcm4908_thermal_get_temp,
 ++};
 ++
-++static const struct hwmon_ops bcm4908_temp_ops = {
-++	.visible = 0444,
-++	.read = bcm4908_temp_read,
-++};
-++
-++static const struct hwmon_chip_info bcm4908_temp_chip_info = {
-++	.ops = &bcm4908_temp_ops,
-++	.info = bcm4908_temp_info,
-++};
-++
-++static int bcm4908_temp_probe(struct platform_device *pdev)
+++static int bcm4908_thermal_probe(struct platform_device *pdev)
 ++{
-++	struct device *hwmon;
+++	struct device *dev = &pdev->dev;
+++	struct thermal_zone_device *tz;
 ++	void __iomem *reg;
 ++
 ++	reg = devm_platform_ioremap_resource(pdev, 0);
 ++	if (IS_ERR(reg))
 ++		return PTR_ERR(reg);
 ++
-++	hwmon = devm_hwmon_device_register_with_info(&pdev->dev, "bcm4908_cpu", reg,
-++						     &bcm4908_temp_chip_info, NULL);
-++	return PTR_ERR_OR_ZERO(hwmon);
+++	tz = devm_thermal_of_zone_register(dev, 0, reg, &bcm4908_thermal_ops);
+++	if (IS_ERR(tz))
+++		return dev_err_probe(dev, PTR_ERR(tz), "failed to register the thermal zone\n");
+++
+++	if (devm_thermal_add_hwmon_sysfs(dev, tz))
+++		dev_warn(dev, "failed to add hwmon sysfs attributes\n");
+++
+++	return 0;
 ++}
 ++
-++static const struct of_device_id bcm4908_temp_of_match[] = {
-++	{ .compatible = "brcm,bcm4908-cpu-temp" },
+++static const struct of_device_id bcm4908_thermal_of_match[] = {
+++	{ .compatible = "brcm,bcm4908-thermal" },
 ++	{ }
 ++};
-++MODULE_DEVICE_TABLE(of, bcm4908_temp_of_match);
+++MODULE_DEVICE_TABLE(of, bcm4908_thermal_of_match);
 ++
-++static struct platform_driver bcm4908_temp_driver = {
-++	.probe = bcm4908_temp_probe,
+++static struct platform_driver bcm4908_thermal_driver = {
+++	.probe = bcm4908_thermal_probe,
 ++	.driver = {
-++		.name = "bcm4908-temp",
-++		.of_match_table = bcm4908_temp_of_match,
+++		.name = "bcm4908-thermal",
+++		.of_match_table = bcm4908_thermal_of_match,
 ++	},
 ++};
-++module_platform_driver(bcm4908_temp_driver);
+++module_platform_driver(bcm4908_thermal_driver);
 ++
-++MODULE_DESCRIPTION("Broadcom BCM4908 CPU temperature sensor");
+++MODULE_DESCRIPTION("Broadcom BCM4908 thermal sensor driver");
 ++MODULE_LICENSE("GPL");
-diff --git a/target/linux/bcm4908/patches-6.18/105-arm64-dts-broadcom-bcmbca-bcm4908-describe-the-cpu-temperature-sensor.patch b/target/linux/bcm4908/patches-6.18/105-arm64-dts-broadcom-bcmbca-bcm4908-describe-the-cpu-temperature-sensor.patch
+diff --git a/target/linux/bcm4908/patches-6.18/106-arm64-dts-broadcom-bcmbca-bcm4908-add-the-cpu-thermal-sensor.patch b/target/linux/bcm4908/patches-6.18/106-arm64-dts-broadcom-bcmbca-bcm4908-add-the-cpu-thermal-sensor.patch
 new file mode 100644
-index 0000000..fd9c30c
+index 0000000..61b8d74
 --- /dev/null
-+++ b/target/linux/bcm4908/patches-6.18/105-arm64-dts-broadcom-bcmbca-bcm4908-describe-the-cpu-temperature-sensor.patch
-@@ -0,0 +1,32 @@
++++ b/target/linux/bcm4908/patches-6.18/106-arm64-dts-broadcom-bcmbca-bcm4908-add-the-cpu-thermal-sensor.patch
+@@ -0,0 +1,43 @@
 +From: Daaboulex <39669593+Daaboulex@users.noreply.github.com>
-+Subject: [PATCH] arm64: dts: broadcom: bcmbca: bcm4908: describe the CPU temperature sensor
++Subject: [PATCH] arm64: dts: broadcom: bcmbca: bcm4908: add the CPU thermal sensor
 +
-+The temperature sensor of the CPU cluster sits in the cluster's
-+configuration block at 0x81060000, beyond the window of the axi bus,
-+which ends after the GIC. Widen the window to cover that block and
-+describe the sensor's register.
++The CPU thermal sensor sits in the cluster's configuration block at
++0x81060000, beyond the window of the axi bus, which ends after the GIC.
++Widen the window to cover that block, describe the sensor and give it a
++cpu-thermal zone. The zone has no trip points: the vendor driver's
++throttling and shutdown temperatures are not documented for this SoC,
++and a trip without a cooling device would act on one misread value.
 +
 +---
 +--- a/arch/arm64/boot/dts/broadcom/bcmbca/bcm4908.dtsi
@@ -165,14 +232,23 @@ index 0000000..fd9c30c
 + 
 + 		gic: interrupt-controller@1000 {
 + 			compatible = "arm,gic-400";
-+@@ -92,6 +92,11 @@
++@@ -92,6 +92,20 @@
 + 			reg = <0x1000 0x1000>,
 + 			      <0x2000 0x2000>;
 + 		};
 ++
-++		temperature-sensor@621a0 {
-++			compatible = "brcm,bcm4908-cpu-temp";
+++		cpu_thermal_sensor: thermal-sensor@621a0 {
+++			compatible = "brcm,bcm4908-thermal";
 ++			reg = <0x621a0 0x4>;
+++			#thermal-sensor-cells = <0>;
+++		};
+++	};
+++
+++	thermal-zones {
+++		cpu-thermal {
+++			polling-delay-passive = <0>;
+++			polling-delay = <0>;
+++			thermal-sensors = <&cpu_thermal_sensor>;
 ++		};
 + 	};
 + 

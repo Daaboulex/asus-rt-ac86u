@@ -1,8 +1,10 @@
 def cpu_sensor(router):
-    for hwmon in router.run("ls /sys/class/hwmon").split():
-        if router.run(f"cat /sys/class/hwmon/{hwmon}/name").strip() == "bcm4908_cpu":
-            return f"/sys/class/hwmon/{hwmon}/temp1_input"
-    raise AssertionError("no hwmon device named bcm4908_cpu")
+    for zone in router.run("ls /sys/class/thermal").split():
+        if not zone.startswith("thermal_zone"):
+            continue
+        if router.run(f"cat /sys/class/thermal/{zone}/type").strip() == "cpu-thermal":
+            return f"/sys/class/thermal/{zone}/temp"
+    raise AssertionError("no thermal zone named cpu-thermal")
 
 
 def test_cpu_temperature_reads_like_a_running_cpu(router):
