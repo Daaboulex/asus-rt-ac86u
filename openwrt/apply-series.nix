@@ -31,8 +31,14 @@ pkgs.writeShellApplication {
         exit 1
       fi
       echo "applying $name"
-      if ! patch -p1 --forward --no-backup-if-mismatch < "$change"; then
-        echo "does not apply to this OpenWrt tree, rebase it: $name" >&2
+      if ! applied=$(patch -p1 --forward --no-backup-if-mismatch --fuzz=0 < "$change"); then
+        printf '%s\n' "$applied"
+        echo "does not apply to this OpenWrt tree without fuzz, rebase it: $name" >&2
+        exit 1
+      fi
+      printf '%s\n' "$applied"
+      if grep -q '(offset [0-9]* lines\?)' <<< "$applied"; then
+        echo "applies off its hunk header, restate the hunk at the line it applies: $name" >&2
         exit 1
       fi
       touched=$(sed -n 's|^+++ b/||p' "$change")

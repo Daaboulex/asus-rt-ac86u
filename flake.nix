@@ -112,6 +112,8 @@
               applied = case: seriesApplied "apply-series-${case}" (fixtures + "/tree") (fixtures + "/${case}");
               refusals = {
                 rejects = "rebase it: 0001-notes-change-lines-the-tree-lacks.patch";
+                fuzz = "without fuzz, rebase it: 0001-notes-add-a-line-on-loose-context.patch";
+                offset = "restate the hunk at the line it applies: 0001-notes-add-a-line-off-its-header.patch";
                 merged = "drop it from the series: 0001-notes-add-a-line-the-tree-has.patch";
                 merged-deletion = "drop it from the series: 0001-notes-drop-a-line-the-tree-lacks.patch";
                 no-hunk = "has no hunk";
