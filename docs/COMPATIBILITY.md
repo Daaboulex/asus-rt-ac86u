@@ -38,7 +38,9 @@ the line says so.
   `brcmfmac` refused it there with `-EIO`, logged as `command failed: I/O
   error (-5)`, so the cap had only held after a Wi-Fi restart. Patch
   `884-wifi-brcmfmac-apply-a-transmit-power-set-before-bring-up` keeps the
-  request and sends it to the firmware when the interface comes up.
+  request and sends it to the firmware when the interface comes up. With
+  it, the test passed after a fresh boot on 2026-11-13, every chain of
+  both radios read 9 dBm, and the boot log held no such error.
 - The access points run WPA2 only. In Linux 6.18.62 an access point gets
   WPA3 (SAE) only through firmware offload, which `brcmfmac` enables when
   the firmware reports both `idauth` and `sae`; it has no user-space SAE
