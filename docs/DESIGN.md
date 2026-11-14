@@ -128,7 +128,9 @@ in the package build; the tests in `tests/hardware` run against a router.
   out garbled in flash. Patch 0023 sleeps 20 ms after that reset on the
   BCM4908: with it, 90 warm resets of the same kinds left no crash record,
   while each of the 30 deliberate panics among them left its own
-  (2026-11-13). Cold boots have not been counted with it. Without 0021
+  (2026-11-13). Three cold boots of the shipped image, power pulled for
+  10 s, each reset the switch once, started both radios and left no
+  crash record (2026-11-14). Without 0021
   but with 0023, 90 warm resets of the same kinds, rotated through idle,
   CPU, network and Wi-Fi load, left no crash record either (2026-11-13 and
   14), so 0023 is what stops the crash; without 0021 the switch is probed
