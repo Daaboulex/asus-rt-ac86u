@@ -129,7 +129,10 @@ in the package build; the tests in `tests/hardware` run against a router.
   CPU, network and Wi-Fi load, left no crash record either (2026-11-13 and
   14), so 0023 is what stops the crash; without 0021 the switch is probed
   and reset three times per boot instead of once, which
-  `test_switch_is_reset_once_per_boot` refuses, so 0021 stays.
+  `test_switch_is_reset_once_per_boot` refuses, so 0021 stays. The
+  shipped image of 2026-11-14, with both patches and radio firmware
+  10.10.131.116, came through 45 more such resets with no crash record
+  and the switch reset once per boot.
 - A plain `reboot` took about 50 s from the command to the next kernel,
   against about 6 s for a watchdog reset (2026-11-13). At shutdown procd
   points its stdio at `/dev/ttyS0` instead of `/dev/console` and kills
@@ -140,7 +143,10 @@ in the package build; the tests in `tests/hardware` run against a router.
   read errors and a failed UBI write before a soft lockup panic. Patch
   0024 keeps the console port transmitting: with it a `reboot` reached
   the next kernel 16 s after the command, and five reboots in a row came
-  back with no crash record.
+  back with no crash record. Of 30 `reboot`s in the reset matrices of
+  2026-11-14, 29 went from losing SSH to the next kernel in 7 to 16 s and
+  one took 50 s, the old figure, with no crash record; what held that
+  shutdown is open.
 - Stock CFE RAM stage: `cferam.005`, 361932 bytes, image version HND3221458,
   SHA256 6427360d...4b12. It differs from the GT-AC5300 one in
   `bcm63xx-cfe` (355110 bytes).
