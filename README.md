@@ -95,6 +95,10 @@ Three switches open the tests that need more than a look:
   Broadcom's worldwide locale and ignores the country set on the router.
   A transmit power of 9 dBm on each radio keeps them within those limits.
 - A radar (DFS) channel cannot carry an access point.
+- On 5 GHz the radio firmware that offers WPA3 sends beacons and every
+  frame at a legacy rate far weaker than its fast data, so a distant
+  client may find the 5 GHz networks late; `docs/COMPATIBILITY.md` lists
+  what was measured and ruled out.
 - There is no hardware NAT offload; routing runs on the CPU.
 - The radios report no temperature. The CPU does.
 - Rescue mode answers on a LAN port only, and serves no web page.
