@@ -85,29 +85,26 @@ the line says so.
   client that supports it is refused for not using it unless `sae_pwe` is
   0. Beacon protection (BIGTK) and Transition Disable are in no 4366c0
   firmware found.
-- On firmware 10.10.131.81 and 10.10.131.116 the 5 GHz beacons arrive much
-  weaker than on 10.28.2. On 2026-11-14 a client at one spot averaged five
-  scans per firmware: 5 GHz beacons read -45 dBm on 10.28.2, -73 dBm on
-  10.10.131.81 and -73 dBm on 10.10.131.116, while 2.4 GHz beacons read -37
-  to -42 dBm on all three and 5 GHz data frames on 10.10.131.81 stayed at
-  -44 to -55 dBm and 780 to 866 Mbit/s. The firmware reports the same
-  transmit power target (9 dBm per chain), chains and core masks on 10.28.2
-  and 10.10.131.81, and the board's calibration carries per-rate offsets
-  for legacy rates on 5 GHz, so a client farther away may find the 5 GHz
-  networks later than before. On 10.10.131.116 the drop covers every
-  legacy OFDM frame on 5 GHz, not the beacons alone: on 2026-11-14 a client
-  read the access point's data at -64 to -69 dBm at VHT rates and at -78 dBm
-  with the 5 GHz unicast rate forced to 6 Mbit/s (`5g_rate` 12), back to
-  -55 to -71 dBm on auto. Neither a lower transmit power cap nor a beacon
-  offset of 6 dB (`bcnprs_txpwr_offset`) moved the 5 GHz beacons, nor did
-  adding zero `legofdmbw205g*po` offsets to the board's calibration, and
-  every single transmit chain sent them weak (-70 to -85 dBm, one chain
-  at a time through `txchain`, against -65 dBm with all four), so no one
-  chain or front end is at fault. The firmware refuses any country but
-  the one it runs, so its regulatory table cannot be swapped to test a
-  locale's legacy limits. Which power table 10.10.131 uses for legacy
-  OFDM on 5 GHz is open. 10.28.2 and
-  10.10.131.81 offer the identical channel and power table, 42 entries.
+- Firmware 10.10.131.116 as published sends 5 GHz beacons at its largest
+  power backoff. The routine that sets the backoff of beacons and probe
+  responses keeps the frame at least 10 dB under the transmit power cap;
+  when the cap leaves less than that, as the EU cap of 9 dBm does, the
+  difference goes negative in an unsigned byte, wraps, and is clamped to
+  the largest backoff. On 2026-11-14 a monitor-mode capture on channel 36,
+  reading the radiotap signal of every frame, found the 5 GHz beacons at -79
+  to -82 dBm while data from the same access point read -59 dBm and probe
+  responses wandered from -54 to -80 dBm; a client's idle signal, which
+  follows the beacons, read -78 dBm. Clients judge a band by its beacons,
+  so they kept to 2.4 GHz. No runtime setting reaches the backoff:
+  `bcn_rotate`, `force_bcn_rspec`, `bcnprs_txpwr_offset` and `min_txpower`
+  left the beacons where they were, and the firmware refuses a country
+  change. The firmware package changes that one instruction, at offset
+  0x3a554 of the file, to set the backoff to 0, so these frames go out at
+  the cap; the same capture then read beacons and probe responses at -45.5
+  dBm and the client's idle signal at -44 dBm, 10 dB under the 2.4 GHz
+  beacons at that spot. 10.10.131.81 sent equally weak 5 GHz beacons; its
+  code was not examined. 10.28.2 and 10.10.131.81 offer the identical
+  channel and power table, 42 entries.
 - Firmware 10.10.131.116 runs both radios in Broadcom's host TX header
   mode unless the board NVRAM says otherwise: it reads `dhdhdr`, `htxhdr`
   and `amsdufrag` and takes 1 for each that is absent, and logs the result
