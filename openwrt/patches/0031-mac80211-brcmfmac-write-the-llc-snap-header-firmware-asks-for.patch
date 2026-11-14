@@ -13,7 +13,7 @@ index 8fbe002..27d1dd7 100644
  
 diff --git a/package/kernel/mac80211/patches/brcm/887-wifi-brcmfmac-pcie-write-the-LLC-SNAP-header-firmware-asks-the-host-for.patch b/package/kernel/mac80211/patches/brcm/887-wifi-brcmfmac-pcie-write-the-LLC-SNAP-header-firmware-asks-the-host-for.patch
 new file mode 100644
-index 0000000..84810c9
+index 0000000..962ec90
 --- /dev/null
 +++ b/package/kernel/mac80211/patches/brcm/887-wifi-brcmfmac-pcie-write-the-LLC-SNAP-header-firmware-asks-the-host-for.patch
 @@ -0,0 +1,186 @@
@@ -129,24 +129,24 @@ index 0000000..84810c9
 + static void brcmf_msgbuf_txflow(struct brcmf_msgbuf *msgbuf, u16 flowid)
 + {
 + 	struct brcmf_flowring *flow = msgbuf->flow;
-+@@ -730,6 +764,7 @@
++@@ -730,6 +764,8 @@
 + 	u32 pktid;
 + 	struct msgbuf_tx_msghdr *tx_msghdr;
 + 	u64 address;
 ++	u32 hdrlen;
+++	u8 ifidx;
 + 
 + 	commonring = msgbuf->flowrings[flowid];
 + 	if (!brcmf_commonring_write_available(commonring))
-+@@ -746,9 +781,22 @@
++@@ -746,9 +782,21 @@
 + 			break;
 + 		}
 + 		skb_orphan(skb);
 ++		hdrlen = ETH_HLEN;
 ++		if (msgbuf->tx_llcsnap) {
 ++			if (brcmf_msgbuf_tx_llcsnap_push(skb)) {
-++				brcmf_txfinalize(brcmf_get_ifp(drvr,
-++					brcmf_flowring_ifidx_get(flow, flowid)),
-++					skb, false);
+++				ifidx = brcmf_flowring_ifidx_get(flow, flowid);
+++				brcmf_txfinalize(brcmf_get_ifp(drvr, ifidx), skb, false);
 ++				continue;
 ++			}
 ++			hdrlen += BRCMF_MSGBUF_LLCSNAP_LEN;

@@ -13,7 +13,7 @@ index 19e7c57..eb01ab4 100644
  
 diff --git a/package/kernel/mac80211/patches/brcm/883-wifi-brcmfmac-expose-the-radio-led-through-leddc.patch b/package/kernel/mac80211/patches/brcm/883-wifi-brcmfmac-expose-the-radio-led-through-leddc.patch
 new file mode 100644
-index 0000000..59b202e
+index 0000000..3b4c277
 --- /dev/null
 +++ b/package/kernel/mac80211/patches/brcm/883-wifi-brcmfmac-expose-the-radio-led-through-leddc.patch
 @@ -0,0 +1,171 @@
@@ -89,7 +89,7 @@ index 0000000..59b202e
 ++	if (brcmf_fil_iovar_int_get(ifp, "leddc", &leddc))
 ++		return;
 ++
-++	led = kzalloc(sizeof(*led), GFP_KERNEL);
+++	led = kzalloc_obj(*led, GFP_KERNEL);
 ++	if (!led)
 ++		return;
 ++
