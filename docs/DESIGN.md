@@ -144,7 +144,11 @@ in the package build; the tests in `tests/hardware` run against a router.
   `test_switch_is_reset_once_per_boot` refuses, so 0021 stays. The
   shipped image of 2026-11-14, with both patches and radio firmware
   10.10.131.116, came through 45 more such resets with no crash record
-  and the switch reset once per boot.
+  and the switch reset once per boot. A second run of 45 on the same
+  driver crashed once, with an oops in brcmfmac's flowring enqueue after
+  the firmware refused a flowring at bring-up, which patch 895 fixes;
+  45 resets of the image with 895 left no crash record, and every
+  `reboot` among them reached the next kernel within 15 s.
 - A plain `reboot` took about 50 s from the command to the next kernel,
   against about 6 s for a watchdog reset (2026-11-13). At shutdown procd
   points its stdio at `/dev/ttyS0` instead of `/dev/console` and kills
