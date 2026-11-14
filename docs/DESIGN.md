@@ -50,6 +50,12 @@ in the package build; the tests in `tests/hardware` run against a router.
 - A patch upstream has merged leaves the series: `openwrt-series-applies`
   stops on it, and the `merged` case of `openwrt-apply-series-fixtures`
   holds that rule.
+- A brcmfmac fix upstream merged after the backports release OpenWrt pins
+  is carried as that commit, unchanged, under `patches/brcm/00N-vX.Y-…`,
+  ahead of OpenWrt's and our own patches, which are refreshed on top of
+  it; our patches are not written around its absence. When OpenWrt moves
+  to a backports release that has it, the mac80211 build stops on it as
+  already applied, and it leaves.
 - The services the image adds change nothing until configured: `pbr` and
   `sqm-scripts` ship switched off, held by
   `test_added_service_ships_switched_off`. `adblock` ships with
