@@ -22,8 +22,16 @@ Instructions for AI assistants. CONTRIBUTING.md applies to you as well; read it 
   works. A change to the image is run on the unit with `nix run .#hardware-test` before it lands.
 - Before a test that can cut access to the unit, know the way back: failsafe or rescue mode, as
   the README describes.
+- A rebuild of the image carries every fix found so far. While the unit is up, investigate every
+  open item that needs no rebuild, gather the changes into the series, then build and flash once.
+- Before a test on the unit, stream its whole log (`logread -f`, kernel and daemons) to a file
+  that outlives a reboot of the unit, watch it for client, access point, driver, link and crash
+  events, and report from that record.
 - Resetting or reflashing the router cuts every host whose route goes through it. Say when a
   series of resets starts and ends, so nothing else fetches through the router meanwhile.
+- A setting changed on a running radio is an outage for everyone on it, the same as a reset: say
+  when it starts and ends, and arm a timed revert on the unit before the change, so a lost
+  connection undoes it.
 - Never unload `brcmfmac` on a running unit: its teardown can oops, on 10.28.2 and on newer radio
   firmware alike. Reboot instead.
 - Bring Wi-Fi back with `wifi down` then `wifi up`. A partial reload has reordered the access
