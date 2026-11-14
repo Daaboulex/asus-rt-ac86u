@@ -125,9 +125,10 @@ the line says so.
   10.28.2 has no such mode, and the router's log stream from 2026-11-10 to
   13 on it holds no watchdog. brcmfmac's multi-radio NVRAM format passes a
   radio only the keys numbered for it, so a key without a number never
-  reaches the firmware. Patch 897 holds `vht_features` at 1 on 2.4 GHz; it
-  was written for watchdogs counted with the mode on, and whether 7 is
-  stable with the mode off has not been measured.
+  reaches the firmware. With the mode off the 2.4 GHz radio runs
+  `vht_features` 7, the value patch 880 leaves, again: on 2026-11-14 two
+  downloads of 157 MB to a client linked at 144 Mbit/s and the next 35
+  minutes of use logged no watchdog, no transmit stall and no crash record.
 - Protected management frames (802.11w) work, optional, on every network.
   The firmware builds the RSN element of beacons and probe responses
   itself from what brcmfmac passes, hostapd sends its own in message 3 of
