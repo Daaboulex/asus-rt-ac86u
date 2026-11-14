@@ -13,7 +13,7 @@ index 8fbe002..27d1dd7 100644
  
 diff --git a/package/kernel/mac80211/patches/brcm/887-wifi-brcmfmac-pcie-write-the-LLC-SNAP-header-firmware-asks-the-host-for.patch b/package/kernel/mac80211/patches/brcm/887-wifi-brcmfmac-pcie-write-the-LLC-SNAP-header-firmware-asks-the-host-for.patch
 new file mode 100644
-index 0000000..8291794
+index 0000000..84810c9
 --- /dev/null
 +++ b/package/kernel/mac80211/patches/brcm/887-wifi-brcmfmac-pcie-write-the-LLC-SNAP-header-firmware-asks-the-host-for.patch
 @@ -0,0 +1,186 @@
@@ -91,7 +91,7 @@ index 0000000..8291794
 + 	u32 rxbufpost;
 + 
 + 	u32 max_ioctlrespbuf;
-+@@ -695,6 +698,37 @@
++@@ -718,6 +721,37 @@
 + }
 + 
 + 
@@ -129,7 +129,7 @@ index 0000000..8291794
 + static void brcmf_msgbuf_txflow(struct brcmf_msgbuf *msgbuf, u16 flowid)
 + {
 + 	struct brcmf_flowring *flow = msgbuf->flow;
-+@@ -707,6 +741,7 @@
++@@ -730,6 +764,7 @@
 + 	u32 pktid;
 + 	struct msgbuf_tx_msghdr *tx_msghdr;
 + 	u64 address;
@@ -137,7 +137,7 @@ index 0000000..8291794
 + 
 + 	commonring = msgbuf->flowrings[flowid];
 + 	if (!brcmf_commonring_write_available(commonring))
-+@@ -723,9 +758,22 @@
++@@ -746,9 +781,22 @@
 + 			break;
 + 		}
 + 		skb_orphan(skb);
@@ -161,7 +161,7 @@ index 0000000..8291794
 + 			brcmf_flowring_reinsert(flow, flowid, skb);
 + 			bphy_err(drvr, "No PKTID available !!\n");
 + 			break;
-+@@ -734,6 +782,8 @@
++@@ -757,6 +805,8 @@
 + 		if (!ret_ptr) {
 + 			brcmf_msgbuf_get_pktid(msgbuf->drvr->bus_if->dev,
 + 					       msgbuf->tx_pktids, pktid);
@@ -170,7 +170,7 @@ index 0000000..8291794
 + 			brcmf_flowring_reinsert(flow, flowid, skb);
 + 			break;
 + 		}
-+@@ -748,9 +798,13 @@
++@@ -771,9 +821,13 @@
 + 		tx_msghdr->flags |= (skb->priority & 0x07) <<
 + 				    BRCMF_MSGBUF_PKT_FLAGS_PRIO_SHIFT;
 + 		tx_msghdr->seg_cnt = 1;
@@ -186,7 +186,7 @@ index 0000000..8291794
 + 		tx_msghdr->data_buf_addr.high_addr = cpu_to_le32(address >> 32);
 + 		tx_msghdr->data_buf_addr.low_addr =
 + 			cpu_to_le32(address & 0xffffffff);
-+@@ -895,6 +949,8 @@
++@@ -924,6 +978,8 @@
 + 	commonring = msgbuf->flowrings[flowid];
 + 	atomic_dec(&commonring->outstanding_tx);
 + 
@@ -195,7 +195,7 @@ index 0000000..8291794
 + 	brcmf_txfinalize(brcmf_get_ifp(msgbuf->drvr, tx_status->msg.ifidx),
 + 			 skb, true);
 + }
-+@@ -1594,6 +1650,7 @@
++@@ -1629,6 +1685,7 @@
 + 		goto fail;
 + 
 + 	msgbuf->rx_dataoffset = if_msgbuf->rx_dataoffset;

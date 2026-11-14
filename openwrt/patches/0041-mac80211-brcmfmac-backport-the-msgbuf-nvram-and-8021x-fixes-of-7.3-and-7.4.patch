@@ -1,0 +1,616 @@
+diff --git a/package/kernel/mac80211/Makefile b/package/kernel/mac80211/Makefile
+index 65ed559..ba14dee 100644
+--- a/package/kernel/mac80211/Makefile
++++ b/package/kernel/mac80211/Makefile
+@@ -12,7 +12,7 @@ PKG_NAME:=mac80211
+ 
+ PKG_SOURCE_VERSION:=7.2
+ PKG_VERSION:=$(subst -,_,$(PKG_SOURCE_VERSION))
+-PKG_RELEASE:=25
++PKG_RELEASE:=26
+ PKG_LICENSE:=GPL-2.0-only
+ PKG_LICENSE_FILES:=COPYING
+ 
+diff --git a/package/kernel/mac80211/patches/brcm/001-v7.3-wifi-brcmfmac-validate-msgbuf-flowring-IDs-before-use.patch b/package/kernel/mac80211/patches/brcm/001-v7.3-wifi-brcmfmac-validate-msgbuf-flowring-IDs-before-use.patch
+new file mode 100644
+index 0000000..6e8b123
+--- /dev/null
++++ b/package/kernel/mac80211/patches/brcm/001-v7.3-wifi-brcmfmac-validate-msgbuf-flowring-IDs-before-use.patch
+@@ -0,0 +1,124 @@
++From 32856f39fefdc75bd253cab999f996750628648e Mon Sep 17 00:00:00 2001
++From: Can Peng <pengcan@kylinos.cn>
++Date: Thu, 23 Jul 2026 13:56:17 +0800
++Subject: [PATCH] wifi: brcmfmac: validate msgbuf flowring IDs before use
++
++Firmware messages carry flow_ring_id values which brcmfmac converts
++to an internal flowid by subtracting
++BRCMF_H2D_MSGRING_FLOWRING_IDSTART. The resulting value is used as
++a bit index in txstatus_done_map and as an array index into
++msgbuf->flowrings and the flowring state.
++
++Validate the firmware supplied flow_ring_id before using it. This
++prevents flow_ring_id values below BRCMF_H2D_MSGRING_FLOWRING_IDSTART
++from underflowing and rejects values outside msgbuf->max_flowrings.
++
++In the tx status path, complete the packet with an error after
++removing a valid packet id so the skb is not leaked when the flow
++ring id is invalid.
++
++Signed-off-by: Can Peng <pengcan@kylinos.cn>
++Acked-by: Arend van Spriel <arend.vanspriel@broadcom.com>
++Link: https://patch.msgid.link/20260723055618.550834-1-pengcan@kylinos.cn
++Signed-off-by: Johannes Berg <johannes.berg@intel.com>
++---
++ .../broadcom/brcm80211/brcmfmac/msgbuf.c      | 46 ++++++++++++++++---
++ 1 file changed, 40 insertions(+), 6 deletions(-)
++
++diff --git a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/msgbuf.c b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/msgbuf.c
++index ba1ce1552e0f43..8146d50d6f072a 100644
++--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/msgbuf.c
+++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/msgbuf.c
++@@ -560,6 +560,28 @@ brcmf_msgbuf_remove_flowring(struct brcmf_msgbuf *msgbuf, u16 flowid)
++ 	brcmf_flowring_delete(msgbuf->flow, flowid);
++ }
++ 
+++static bool brcmf_msgbuf_get_flowid(struct brcmf_msgbuf *msgbuf,
+++				    u16 flow_ring_id, u16 *flowid)
+++{
+++	u32 id = flow_ring_id;
+++
+++	if (id < BRCMF_H2D_MSGRING_FLOWRING_IDSTART) {
+++		bphy_err(msgbuf->drvr, "invalid flowring id %u\n",
+++			 flow_ring_id);
+++		return false;
+++	}
+++
+++	id -= BRCMF_H2D_MSGRING_FLOWRING_IDSTART;
+++	if (id >= msgbuf->max_flowrings) {
+++		bphy_err(msgbuf->drvr, "invalid flowring id %u\n",
+++			 flow_ring_id);
+++		return false;
+++	}
+++
+++	*flowid = id;
+++	return true;
+++}
+++
++ 
++ static struct brcmf_msgbuf_work_item *
++ brcmf_msgbuf_dequeue_work(struct brcmf_msgbuf *msgbuf)
++@@ -880,17 +902,23 @@ brcmf_msgbuf_process_txstatus(struct brcmf_msgbuf *msgbuf, void *buf)
++ 	struct msgbuf_tx_status *tx_status;
++ 	u32 idx;
++ 	struct sk_buff *skb;
+++	u16 flow_ring_id;
++ 	u16 flowid;
++ 
++ 	tx_status = (struct msgbuf_tx_status *)buf;
++ 	idx = le32_to_cpu(tx_status->msg.request_id) - 1;
++-	flowid = le16_to_cpu(tx_status->compl_hdr.flow_ring_id);
++-	flowid -= BRCMF_H2D_MSGRING_FLOWRING_IDSTART;
+++	flow_ring_id = le16_to_cpu(tx_status->compl_hdr.flow_ring_id);
++ 	skb = brcmf_msgbuf_get_pktid(msgbuf->drvr->bus_if->dev,
++ 				     msgbuf->tx_pktids, idx);
++ 	if (!skb)
++ 		return;
++ 
+++	if (!brcmf_msgbuf_get_flowid(msgbuf, flow_ring_id, &flowid)) {
+++		brcmf_txfinalize(brcmf_get_ifp(msgbuf->drvr, tx_status->msg.ifidx),
+++				 skb, false);
+++		return;
+++	}
+++
++ 	set_bit(flowid, msgbuf->txstatus_done_map);
++ 	commonring = msgbuf->flowrings[flowid];
++ 	atomic_dec(&commonring->outstanding_tx);
++@@ -1237,13 +1265,16 @@ brcmf_msgbuf_process_flow_ring_create_response(struct brcmf_msgbuf *msgbuf,
++ 	struct msgbuf_flowring_create_resp *flowring_create_resp;
++ 	u16 status;
++ 	u16 flowid;
+++	u16 flow_ring_id;
++ 
++ 	flowring_create_resp = (struct msgbuf_flowring_create_resp *)buf;
++ 
++-	flowid = le16_to_cpu(flowring_create_resp->compl_hdr.flow_ring_id);
++-	flowid -= BRCMF_H2D_MSGRING_FLOWRING_IDSTART;
+++	flow_ring_id = le16_to_cpu(flowring_create_resp->compl_hdr.flow_ring_id);
++ 	status =  le16_to_cpu(flowring_create_resp->compl_hdr.status);
++ 
+++	if (!brcmf_msgbuf_get_flowid(msgbuf, flow_ring_id, &flowid))
+++		return;
+++
++ 	if (status) {
++ 		bphy_err(drvr, "Flowring creation failed, code %d\n", status);
++ 		brcmf_msgbuf_remove_flowring(msgbuf, flowid);
++@@ -1266,13 +1297,16 @@ brcmf_msgbuf_process_flow_ring_delete_response(struct brcmf_msgbuf *msgbuf,
++ 	struct msgbuf_flowring_delete_resp *flowring_delete_resp;
++ 	u16 status;
++ 	u16 flowid;
+++	u16 flow_ring_id;
++ 
++ 	flowring_delete_resp = (struct msgbuf_flowring_delete_resp *)buf;
++ 
++-	flowid = le16_to_cpu(flowring_delete_resp->compl_hdr.flow_ring_id);
++-	flowid -= BRCMF_H2D_MSGRING_FLOWRING_IDSTART;
+++	flow_ring_id = le16_to_cpu(flowring_delete_resp->compl_hdr.flow_ring_id);
++ 	status =  le16_to_cpu(flowring_delete_resp->compl_hdr.status);
++ 
+++	if (!brcmf_msgbuf_get_flowid(msgbuf, flow_ring_id, &flowid))
+++		return;
+++
++ 	if (status) {
++ 		bphy_err(drvr, "Flowring deletion failed, code %d\n", status);
++ 		brcmf_flowring_delete(msgbuf->flow, flowid);
+diff --git a/package/kernel/mac80211/patches/brcm/002-v7.3-wifi-brcmfmac-Set-DMA-direction-for-msgbuf-packet-IDs.patch b/package/kernel/mac80211/patches/brcm/002-v7.3-wifi-brcmfmac-Set-DMA-direction-for-msgbuf-packet-IDs.patch
+new file mode 100644
+index 0000000..bc06766
+--- /dev/null
++++ b/package/kernel/mac80211/patches/brcm/002-v7.3-wifi-brcmfmac-Set-DMA-direction-for-msgbuf-packet-IDs.patch
+@@ -0,0 +1,38 @@
++From f0ba5fd51ff23077ce66cb9be79d41a4b7c19c5e Mon Sep 17 00:00:00 2001
++From: Can Peng <pengcan@kylinos.cn>
++Date: Fri, 24 Jul 2026 17:25:30 +0800
++Subject: [PATCH] wifi: brcmfmac: Set DMA direction for msgbuf packet IDs
++
++brcmf_msgbuf_init_pktids() takes the DMA direction from its callers,
++but never stores it in the packet ID state.  Since the state is zeroed,
++pktids->direction remains DMA_BIDIRECTIONAL for both the TX and RX
++packet ID pools.
++
++All msgbuf packet ID map and unmap paths use pktids->direction.  As a
++result, TX buffers requested with DMA_TO_DEVICE and RX buffers requested
++with DMA_FROM_DEVICE are mapped and unmapped as DMA_BIDIRECTIONAL
++instead.
++
++Store the caller-provided direction when initializing the packet ID
++state.
++
++Signed-off-by: Can Peng <pengcan@kylinos.cn>
++Acked-by: Arend van Spriel <arend.vanspriel@broadcom.com>
++Link: https://patch.msgid.link/20260724092530.674624-1-pengcan@kylinos.cn
++Signed-off-by: Johannes Berg <johannes.berg@intel.com>
++---
++ drivers/net/wireless/broadcom/brcm80211/brcmfmac/msgbuf.c | 1 +
++ 1 file changed, 1 insertion(+)
++
++diff --git a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/msgbuf.c b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/msgbuf.c
++index 8146d50d6f072a..069ba7016654ec 100644
++--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/msgbuf.c
+++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/msgbuf.c
++@@ -310,6 +310,7 @@ brcmf_msgbuf_init_pktids(u32 nr_array_entries,
++ 	}
++ 	pktids->array = array;
++ 	pktids->array_size = nr_array_entries;
+++	pktids->direction = direction;
++ 
++ 	return pktids;
++ }
+diff --git a/package/kernel/mac80211/patches/brcm/003-v7.3-wifi-brcmfmac-fix-lost-802.1x-TX-completion-wakeup.patch b/package/kernel/mac80211/patches/brcm/003-v7.3-wifi-brcmfmac-fix-lost-802.1x-TX-completion-wakeup.patch
+new file mode 100644
+index 0000000..e43a429
+--- /dev/null
++++ b/package/kernel/mac80211/patches/brcm/003-v7.3-wifi-brcmfmac-fix-lost-802.1x-TX-completion-wakeup.patch
+@@ -0,0 +1,40 @@
++From 621d90169cef6c8da5b6134db5c0c4e23cdd09ce Mon Sep 17 00:00:00 2001
++From: Karl Mehltretter <kmehltretter@gmail.com>
++Date: Tue, 11 Aug 2026 10:27:02 +0200
++Subject: [PATCH] wifi: brcmfmac: fix lost 802.1x TX completion wakeup
++
++brcmf_txfinalize() decrements pend_8021x_cnt before a lockless
++waitqueue_active() check. atomic_dec() does not order the decrement
++against the check.
++
++The waiter can therefore observe a nonzero count while the waker observes
++an empty queue, losing the final wakeup and delaying key installation
++until the 950 ms timeout.
++
++Add smp_mb__after_atomic() to order the decrement before the queue
++check. wait_event_timeout() provides the matching barrier. LKMM confirms
++that this forbids the lost-wakeup outcome.
++
++Fixes: 21fff75d2fb6 ("brcmfmac: use wait_event_timeout for 8021x pending count")
++Assisted-by: Claude:claude-fable-5
++Signed-off-by: Karl Mehltretter <kmehltretter@gmail.com>
++Acked-by: Arend van Spriel <arend.vanspriel@broadcom.com>
++Link: https://patch.msgid.link/20260811082702.44521-1-kmehltretter@gmail.com
++Signed-off-by: Johannes Berg <johannes.berg@intel.com>
++---
++ drivers/net/wireless/broadcom/brcm80211/brcmfmac/core.c | 2 ++
++ 1 file changed, 2 insertions(+)
++
++diff --git a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/core.c b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/core.c
++index dad6f4563d1468..d2ae679856067a 100644
++--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/core.c
+++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/core.c
++@@ -555,6 +555,8 @@ void brcmf_txfinalize(struct brcmf_if *ifp, struct sk_buff *txp, bool success)
++ 
++ 	if (type == ETH_P_PAE) {
++ 		atomic_dec(&ifp->pend_8021x_cnt);
+++		/* Order the decrement before waitqueue_active() */
+++		smp_mb__after_atomic();
++ 		if (waitqueue_active(&ifp->pend_8021x_wait))
++ 			wake_up(&ifp->pend_8021x_wait);
++ 	}
+diff --git a/package/kernel/mac80211/patches/brcm/004-v7.4-wifi-brcmfmac-bound-NVRAM-comment-parsing.patch b/package/kernel/mac80211/patches/brcm/004-v7.4-wifi-brcmfmac-bound-NVRAM-comment-parsing.patch
+new file mode 100644
+index 0000000..39c2494
+--- /dev/null
++++ b/package/kernel/mac80211/patches/brcm/004-v7.4-wifi-brcmfmac-bound-NVRAM-comment-parsing.patch
+@@ -0,0 +1,73 @@
++From 3ffb0de666c6dc3831a16ad33f9c9fd8a9310dcb Mon Sep 17 00:00:00 2001
++From: Pengpeng Hou <hppiscas@163.com>
++Date: Sun, 20 Sep 2026 11:44:14 +0800
++Subject: [PATCH] wifi: brcmfmac: bound NVRAM comment parsing
++
++The NVRAM comment handler searches for a newline with strchr() even
++though its input is a firmware buffer with an explicit length. A comment
++at the end of an unterminated buffer can make the search read past that
++input.
++
++Keep the input extent in the parser and use bounded searches for newline
++and NUL. Preserve the full input length: the capped size used to
++allocate the output is not a bound on the input, which may contain more
++than 64KiB of comments. Leave the outer parsing limit unchanged.
++
++The issue was found by our static-analysis tool.
++
++Assisted-by: gpt 5
++Signed-off-by: Pengpeng Hou <hppiscas@163.com>
++Acked-by: Arend van Spriel <arend.vanspriel@broadcom.com>
++Link: https://patch.msgid.link/20260920034414.16948-1-hppiscas@163.com
++Signed-off-by: Johannes Berg <johannes.berg@intel.com>
++---
++ .../wireless/broadcom/brcm80211/brcmfmac/firmware.c | 13 +++++++++----
++ 1 file changed, 9 insertions(+), 4 deletions(-)
++
++diff --git a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/firmware.c b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/firmware.c
++index 22ff326f1924a3..a2ee7b43aa2108 100644
++--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/firmware.c
+++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/firmware.c
++@@ -37,6 +37,7 @@ enum nvram_parser_state {
++  *
++  * @state: current parser state.
++  * @data: input buffer being parsed.
+++ * @data_len: size of the input buffer, including comments.
++  * @nvram: output buffer with parse result.
++  * @nvram_len: length of parse result.
++  * @line: current line.
++@@ -51,6 +52,7 @@ enum nvram_parser_state {
++ struct nvram_parser {
++ 	enum nvram_parser_state state;
++ 	const u8 *data;
+++	size_t data_len;
++ 	u8 *nvram;
++ 	u32 nvram_len;
++ 	u32 line;
++@@ -171,12 +173,14 @@ brcmf_nvram_handle_value(struct nvram_parser *nvp)
++ static enum nvram_parser_state
++ brcmf_nvram_handle_comment(struct nvram_parser *nvp)
++ {
++-	char *eoc, *sol;
+++	const char *eoc, *sol;
+++	size_t remaining;
++ 
++-	sol = (char *)&nvp->data[nvp->pos];
++-	eoc = strchr(sol, '\n');
+++	sol = (const char *)&nvp->data[nvp->pos];
+++	remaining = nvp->data_len - nvp->pos;
+++	eoc = strnchr(sol, remaining, '\n');
++ 	if (!eoc) {
++-		eoc = strchr(sol, '\0');
+++		eoc = memchr(sol, '\0', remaining);
++ 		if (!eoc)
++ 			return END;
++ 	}
++@@ -210,6 +214,7 @@ static int brcmf_init_nvram_parser(struct nvram_parser *nvp,
++ 
++ 	memset(nvp, 0, sizeof(*nvp));
++ 	nvp->data = data;
+++	nvp->data_len = data_len;
++ 	/* Limit size to MAX_NVRAM_SIZE, some files contain lot of comment */
++ 	if (data_len > BRCMF_FW_MAX_NVRAM_SIZE)
++ 		size = BRCMF_FW_MAX_NVRAM_SIZE;
+diff --git a/package/kernel/mac80211/patches/brcm/005-v7.4-wifi-brcmfmac-map-msgbuf-RX-packet-IDs-bidirectional.patch b/package/kernel/mac80211/patches/brcm/005-v7.4-wifi-brcmfmac-map-msgbuf-RX-packet-IDs-bidirectional.patch
+new file mode 100644
+index 0000000..d62264c
+--- /dev/null
++++ b/package/kernel/mac80211/patches/brcm/005-v7.4-wifi-brcmfmac-map-msgbuf-RX-packet-IDs-bidirectional.patch
+@@ -0,0 +1,38 @@
++From 7ed5dce55fa8393972b1bf2bf5af1c818c5e7dc2 Mon Sep 17 00:00:00 2001
++From: Jason Perlow <jperlow@gmail.com>
++Date: Wed, 21 Oct 2026 22:52:38 +0530
++Subject: [PATCH] wifi: brcmfmac: map msgbuf RX packet IDs bidirectional
++
++Commit f0ba5fd51ff2 ("wifi: brcmfmac: Set DMA direction for msgbuf
++packet IDs") maps the RX packet ID buffers DMA_FROM_DEVICE. The
++BCM4364 firmware also reads posted RX buffers, so with VT-d
++translation enabled every such read faults ("PTE Read access is not
++set") and the firmware crashes and resets in a loop.
++
++Map the RX pool DMA_BIDIRECTIONAL again, as before that commit. TX
++keeps DMA_TO_DEVICE.
++
++Fixes: f0ba5fd51ff2 ("wifi: brcmfmac: Set DMA direction for msgbuf packet IDs")
++Cc: stable@vger.kernel.org
++Signed-off-by: Jason Perlow <jperlow@gmail.com>
++Signed-off-by: Aditya Garg <aditya.garg@linux.dev>
++Acked-by: Arend van Spriel <arend.vanspriel@broadcom.com>
++Link: https://patch.msgid.link/20261021172238.10004-1-aditya.garg@linux.dev
++Signed-off-by: Johannes Berg <johannes.berg@intel.com>
++---
++ drivers/net/wireless/broadcom/brcm80211/brcmfmac/msgbuf.c | 2 +-
++ 1 file changed, 1 insertion(+), 1 deletion(-)
++
++diff --git a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/msgbuf.c b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/msgbuf.c
++index 069ba7016654ec..ff47d4827722e0 100644
++--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/msgbuf.c
+++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/msgbuf.c
++@@ -1639,7 +1639,7 @@ int brcmf_proto_msgbuf_attach(struct brcmf_pub *drvr)
++ 	if (!msgbuf->tx_pktids)
++ 		goto fail;
++ 	msgbuf->rx_pktids = brcmf_msgbuf_init_pktids(NR_RX_PKTIDS,
++-						     DMA_FROM_DEVICE);
+++						     DMA_BIDIRECTIONAL);
++ 	if (!msgbuf->rx_pktids)
++ 		goto fail;
++ 
+diff --git a/package/kernel/mac80211/patches/brcm/870-02-rpi-6.12-brcmfmac-Prefer-a-ccode-from-OTP-over-nvram-file.patch b/package/kernel/mac80211/patches/brcm/870-02-rpi-6.12-brcmfmac-Prefer-a-ccode-from-OTP-over-nvram-file.patch
+index 23e149b..40dd047 100644
+--- a/package/kernel/mac80211/patches/brcm/870-02-rpi-6.12-brcmfmac-Prefer-a-ccode-from-OTP-over-nvram-file.patch
++++ b/package/kernel/mac80211/patches/brcm/870-02-rpi-6.12-brcmfmac-Prefer-a-ccode-from-OTP-over-nvram-file.patch
+@@ -22,7 +22,7 @@ Signed-off-by: Phil Elwell <phil@raspberrypi.com>
+  #include <net/cfg80211.h>
+  #include <net/netlink.h>
+  #include <uapi/linux/if_arp.h>
+-@@ -8272,31 +8273,45 @@ static void brcmf_cfg80211_reg_notifier(
++@@ -8272,31 +8273,45 @@
+  	struct brcmf_if *ifp = brcmf_get_ifp(cfg->pub, 0);
+  	struct brcmf_pub *drvr = cfg->pub;
+  	struct brcmf_fil_country_le ccreq;
+@@ -90,7 +90,7 @@ Signed-off-by: Phil Elwell <phil@raspberrypi.com>
+  
+  #include "debug.h"
+  #include "firmware.h"
+-@@ -32,6 +33,8 @@ enum nvram_parser_state {
++@@ -32,6 +33,8 @@
+  	END
+  };
+  
+@@ -99,7 +99,7 @@ Signed-off-by: Phil Elwell <phil@raspberrypi.com>
+  /**
+   * struct nvram_parser - internal info for parser.
+   *
+-@@ -566,11 +569,27 @@ static int brcmf_fw_request_nvram_done(c
++@@ -571,11 +574,27 @@
+  		}
+  	}
+  
+diff --git a/package/kernel/mac80211/patches/brcm/870-04-rpi-6.12-brcmfmac-non-upstream-support-DS1-exit-firmware-re-download.patch b/package/kernel/mac80211/patches/brcm/870-04-rpi-6.12-brcmfmac-non-upstream-support-DS1-exit-firmware-re-download.patch
+index 42aacd8..83f1e6f 100644
+--- a/package/kernel/mac80211/patches/brcm/870-04-rpi-6.12-brcmfmac-non-upstream-support-DS1-exit-firmware-re-download.patch
++++ b/package/kernel/mac80211/patches/brcm/870-04-rpi-6.12-brcmfmac-non-upstream-support-DS1-exit-firmware-re-download.patch
+@@ -39,7 +39,7 @@ JIRA: SWWLAN-136577
+ 
+ --- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/bus.h
+ +++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/bus.h
+-@@ -304,7 +304,7 @@ void brcmf_rx_event(struct device *dev,
++@@ -304,7 +304,7 @@
+  
+  int brcmf_alloc(struct device *dev, struct brcmf_mp_device *settings);
+  /* Indication from bus module regarding presence/insertion of dongle. */
+@@ -59,7 +59,7 @@ JIRA: SWWLAN-136577
+  
+  MODULE_AUTHOR("Broadcom Corporation");
+  MODULE_DESCRIPTION("Broadcom 802.11 wireless LAN fullmac driver.");
+-@@ -273,6 +275,8 @@ int brcmf_c_preinit_dcmds(struct brcmf_i
++@@ -273,6 +275,8 @@
+  	char *clmver;
+  	char *ptr;
+  	s32 err;
+@@ -68,7 +68,7 @@ JIRA: SWWLAN-136577
+  
+  	if (is_valid_ether_addr(ifp->mac_addr)) {
+  		/* set mac address */
+-@@ -432,6 +436,41 @@ int brcmf_c_preinit_dcmds(struct brcmf_i
++@@ -432,6 +436,41 @@
+  		goto done;
+  	}
+  
+@@ -112,7 +112,7 @@ JIRA: SWWLAN-136577
+  				    BRCMF_DEFAULT_SCAN_CHANNEL_TIME);
+ --- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/core.c
+ +++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/core.c
+-@@ -1356,7 +1356,7 @@ int brcmf_alloc(struct device *dev, stru
++@@ -1358,7 +1358,7 @@
+  	return 0;
+  }
+  
+@@ -121,7 +121,7 @@ JIRA: SWWLAN-136577
+  {
+  	struct brcmf_bus *bus_if = dev_get_drvdata(dev);
+  	struct brcmf_pub *drvr = bus_if->drvr;
+-@@ -1399,10 +1399,13 @@ int brcmf_attach(struct device *dev)
++@@ -1401,10 +1401,13 @@
+  
+  	brcmf_fwvid_get_cfg80211_ops(drvr);
+  
+@@ -151,7 +151,7 @@ JIRA: SWWLAN-136577
+  #undef pr_fmt
+ --- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/fweh.h
+ +++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/fweh.h
+-@@ -98,7 +98,8 @@ struct brcmf_cfg80211_info;
++@@ -98,7 +98,8 @@
+  	BRCMF_ABSTRACT_ENUM_DEF(EXT_AUTH_REQ, 0) \
+  	BRCMF_ABSTRACT_ENUM_DEF(EXT_AUTH_FRAME_RX, 1) \
+  	BRCMF_ABSTRACT_ENUM_DEF(MGMT_FRAME_TXSTATUS, 2) \
+@@ -161,7 +161,7 @@ JIRA: SWWLAN-136577
+  
+  #define BRCMF_ENUM_DEF(id, val) \
+  	BRCMF_E_##id = (val),
+-@@ -106,6 +107,12 @@ struct brcmf_cfg80211_info;
++@@ -106,6 +107,12 @@
+  /* firmware event codes sent by the dongle */
+  enum brcmf_fweh_event_code {
+  	BRCMF_FWEH_EVENT_ENUM_DEFLIST
+@@ -174,7 +174,7 @@ JIRA: SWWLAN-136577
+  };
+  #undef BRCMF_ENUM_DEF
+  
+-@@ -284,6 +291,28 @@ struct brcmf_if_event {
++@@ -284,6 +291,28 @@
+  	u8 role;
+  };
+  
+@@ -205,7 +205,7 @@ JIRA: SWWLAN-136577
+  				    void *data);
+ --- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/pcie.c
+ +++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/pcie.c
+-@@ -2217,7 +2217,7 @@ static void brcmf_pcie_setup(struct devi
++@@ -2217,7 +2217,7 @@
+  
+  	init_waitqueue_head(&devinfo->mbdata_resp_wait);
+  
+@@ -229,7 +229,7 @@ JIRA: SWWLAN-136577
+  
+  /* watermark expressed in number of words */
+  #define DEFAULT_F2_WATERMARK    0x8
+-@@ -325,7 +328,16 @@ struct rte_console {
++@@ -325,7 +328,16 @@
+  
+  #define KSO_WAIT_US 50
+  #define MAX_KSO_ATTEMPTS (PMU_MAX_TRANSITION_DLY/KSO_WAIT_US)
+@@ -247,7 +247,7 @@ JIRA: SWWLAN-136577
+  
+  #ifdef DEBUG
+  /* Device console log buffer state */
+-@@ -1106,7 +1118,7 @@ static void brcmf_sdio_get_console_addr(
++@@ -1106,7 +1118,7 @@
+  }
+  #endif /* DEBUG */
+  
+@@ -256,7 +256,7 @@ JIRA: SWWLAN-136577
+  {
+  	struct brcmf_sdio_dev *sdiod = bus->sdiodev;
+  	struct brcmf_core *core = bus->sdio_core;
+-@@ -1195,6 +1207,9 @@ static u32 brcmf_sdio_hostmail(struct br
++@@ -1195,6 +1207,9 @@
+  			 HMB_DATA_FCDATA_MASK | HMB_DATA_VERSION_MASK))
+  		brcmf_err("Unknown mailbox data content: 0x%02x\n",
+  			  hmb_data);
+@@ -266,7 +266,7 @@ JIRA: SWWLAN-136577
+  
+  	return intstatus;
+  }
+-@@ -2582,6 +2597,182 @@ static int brcmf_sdio_intr_rstatus(struc
++@@ -2582,6 +2597,182 @@
+  	return ret;
+  }
+  
+@@ -449,7 +449,7 @@ JIRA: SWWLAN-136577
+  static void brcmf_sdio_dpc(struct brcmf_sdio *bus)
+  {
+  	struct brcmf_sdio_dev *sdiod = bus->sdiodev;
+-@@ -2653,8 +2844,11 @@ static void brcmf_sdio_dpc(struct brcmf_
++@@ -2653,8 +2844,11 @@
+  
+  	/* Handle host mailbox indication */
+  	if (intstatus & I_HMB_HOST_INT) {
+@@ -462,7 +462,7 @@ JIRA: SWWLAN-136577
+  	}
+  
+  	sdio_release_host(bus->sdiodev->func1);
+-@@ -2699,7 +2893,7 @@ static void brcmf_sdio_dpc(struct brcmf_
++@@ -2699,7 +2893,7 @@
+  	brcmf_sdio_clrintr(bus);
+  
+  	if (bus->ctrl_frame_stat && (bus->clkstate == CLK_AVAIL) &&
+@@ -471,7 +471,7 @@ JIRA: SWWLAN-136577
+  		sdio_claim_host(bus->sdiodev->func1);
+  		if (bus->ctrl_frame_stat) {
+  			err = brcmf_sdio_tx_ctrlframe(bus,  bus->ctrl_frame_buf,
+-@@ -3570,6 +3764,10 @@ static int brcmf_sdio_bus_preinit(struct
++@@ -3570,6 +3764,10 @@
+  	if (err < 0)
+  		goto done;
+  
+@@ -482,7 +482,7 @@ JIRA: SWWLAN-136577
+  	bus->tx_hdrlen = SDPCM_HWHDR_LEN + SDPCM_SWHDR_LEN;
+  	if (sdiodev->sg_support) {
+  		bus->txglom = false;
+-@@ -4220,7 +4418,7 @@ static void brcmf_sdio_firmware_callback
++@@ -4220,7 +4418,7 @@
+  	u8 saveclk, bpreq;
+  	u8 devctl;
+  
+@@ -491,7 +491,7 @@ JIRA: SWWLAN-136577
+  
+  	if (err)
+  		goto fail;
+-@@ -4398,12 +4596,25 @@ static void brcmf_sdio_firmware_callback
++@@ -4398,12 +4596,25 @@
+  	}
+  
+  	/* Attach to the common layer, reserve hdr space */
+@@ -518,7 +518,7 @@ JIRA: SWWLAN-136577
+  	/* ready */
+  	return;
+  
+-@@ -4658,3 +4869,40 @@ int brcmf_sdio_sleep(struct brcmf_sdio *
++@@ -4658,3 +4869,40 @@
+  
+  	return ret;
+  }
+@@ -561,7 +561,7 @@ JIRA: SWWLAN-136577
+ +}
+ --- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.h
+ +++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.h
+-@@ -165,6 +165,35 @@ struct brcmf_sdreg {
++@@ -165,6 +165,35 @@
+  struct brcmf_sdio;
+  struct brcmf_sdiod_freezer;
+  
+@@ -597,7 +597,7 @@ JIRA: SWWLAN-136577
+  struct brcmf_sdio_dev {
+  	struct sdio_func *func1;
+  	struct sdio_func *func2;
+-@@ -193,6 +222,8 @@ struct brcmf_sdio_dev {
++@@ -193,6 +222,8 @@
+  	enum brcmf_sdiod_state state;
+  	struct brcmf_sdiod_freezer *freezer;
+  	const struct firmware *clm_fw;
+@@ -606,7 +606,7 @@ JIRA: SWWLAN-136577
+  };
+  
+  /* sdio core registers */
+-@@ -368,4 +399,83 @@ void brcmf_sdio_wowl_config(struct devic
++@@ -368,4 +399,83 @@
+  int brcmf_sdio_sleep(struct brcmf_sdio *bus, bool sleep);
+  void brcmf_sdio_trigger_dpc(struct brcmf_sdio *bus);
+  
+@@ -692,7 +692,7 @@ JIRA: SWWLAN-136577
+  #endif /* BRCMFMAC_SDIO_H */
+ --- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/usb.c
+ +++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/usb.c
+-@@ -1208,7 +1208,7 @@ static void brcmf_usb_probe_phase2(struc
++@@ -1208,7 +1208,7 @@
+  		goto error;
+  
+  	/* Attach to the common driver interface */
+@@ -701,7 +701,7 @@ JIRA: SWWLAN-136577
+  	if (ret)
+  		goto error;
+  
+-@@ -1289,7 +1289,7 @@ static int brcmf_usb_probe_cb(struct brc
++@@ -1289,7 +1289,7 @@
+  		ret = brcmf_alloc(devinfo->dev, devinfo->settings);
+  		if (ret)
+  			goto fail;
+@@ -712,7 +712,7 @@ JIRA: SWWLAN-136577
+  		/* we are done */
+ --- a/drivers/net/wireless/broadcom/brcm80211/include/chipcommon.h
+ +++ b/drivers/net/wireless/broadcom/brcm80211/include/chipcommon.h
+-@@ -308,4 +308,6 @@ struct chipcregs {
++@@ -308,4 +308,6 @@
+  */
+  #define PMU_MAX_TRANSITION_DLY	15000
+  

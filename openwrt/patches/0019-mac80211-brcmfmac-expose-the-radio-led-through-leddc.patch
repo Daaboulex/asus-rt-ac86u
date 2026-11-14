@@ -13,7 +13,7 @@ index 19e7c57..eb01ab4 100644
  
 diff --git a/package/kernel/mac80211/patches/brcm/883-wifi-brcmfmac-expose-the-radio-led-through-leddc.patch b/package/kernel/mac80211/patches/brcm/883-wifi-brcmfmac-expose-the-radio-led-through-leddc.patch
 new file mode 100644
-index 0000000..c173b2e
+index 0000000..59b202e
 --- /dev/null
 +++ b/package/kernel/mac80211/patches/brcm/883-wifi-brcmfmac-expose-the-radio-led-through-leddc.patch
 @@ -0,0 +1,171 @@
@@ -178,7 +178,7 @@ index 0000000..c173b2e
 + struct cfg80211_ops *brcmf_cfg80211_get_ops(struct brcmf_mp_device *settings);
 +--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/core.c
 ++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/core.c
-+@@ -1487,6 +1487,9 @@
++@@ -1489,6 +1489,9 @@
 + 	unregister_inet6addr_notifier(&drvr->inet6addr_notifier);
 + #endif
 + 
