@@ -1,42 +1,44 @@
 diff --git a/package/firmware/brcmfmac-firmware-4366c0-pcie-rt-ac86u/Makefile b/package/firmware/brcmfmac-firmware-4366c0-pcie-rt-ac86u/Makefile
 new file mode 100644
-index 0000000..6252440
+index 0000000..b36effa
 --- /dev/null
 +++ b/package/firmware/brcmfmac-firmware-4366c0-pcie-rt-ac86u/Makefile
-@@ -0,0 +1,47 @@
+@@ -0,0 +1,49 @@
 +# SPDX-License-Identifier: GPL-2.0-or-later
 +
 +include $(TOPDIR)/rules.mk
 +
 +PKG_NAME:=brcmfmac-firmware-4366c0-pcie-rt-ac86u
-+PKG_VERSION:=10.10.131.81
++PKG_VERSION:=10.10.131.116
 +PKG_RELEASE:=1
 +
 +include $(INCLUDE_DIR)/package.mk
 +
-+MERLIN_COMMIT:=2c4d3ee043bd1c714c341d75a9efa8e77c2955b9
-+MERLIN_DONGLE:=release/src-rt-5.02L.07p2axhnd/bcmdrivers/broadcom/net/wl/impl69/sys/src/dongle/bin/4366c0
++GPL_REPO:=threader/DX5401-B0-V517ABYO6C0_GPL
++GPL_COMMIT:=5df85c8c423ee935eed37b81f0d76dc569e2deb0
++GPL_DONGLE:=package/base-files-prebuild/files/rootfs/etc/wlan/dhd/4366c0
 +
 +define Download/rtecdc
-+  URL:=https://raw.githubusercontent.com/RMerl/asuswrt-merlin.ng/$(MERLIN_COMMIT)/$(MERLIN_DONGLE)
++  URL:=https://raw.githubusercontent.com/$(GPL_REPO)/$(GPL_COMMIT)/$(GPL_DONGLE)
 +  URL_FILE:=rtecdc.bin
 +  FILE:=$(PKG_NAME)-$(PKG_VERSION).bin
-+  HASH:=3bf9421f6bc14333f14dc7a561095d678d97ec023da22bd2c6772b51b7b428df
++  HASH:=7be3900075299644d767c4fa3ba6b08aa14b6a363704df9ccb9391570aa1fb04
 +endef
 +$(eval $(call Download,rtecdc))
 +
 +define Package/brcmfmac-firmware-4366c0-pcie-rt-ac86u
 +  SECTION:=firmware
 +  CATEGORY:=Firmware
-+  TITLE:=BCM4366c0 firmware 10.10.131.81 for the ASUS RT-AC86U
++  TITLE:=BCM4366c0 firmware 10.10.131.116 for the ASUS RT-AC86U
 +  DEPENDS:=@TARGET_bcm4908
 +endef
 +
 +define Package/brcmfmac-firmware-4366c0-pcie-rt-ac86u/description
-+  Broadcom's BCA dongle firmware for the BCM4366c0, build 10.10.131.81 from
-+  the asuswrt-merlin.ng GPL tree. It hands SAE authentication to hostapd,
-+  so the access points offer WPA3. It is installed under the board-specific
-+  name brcmfmac tries first, so other boards keep the linux-firmware build.
++  Broadcom's BCA dongle firmware for the BCM4366c0, build 10.10.131.116,
++  the newest published access point build, from a mirror of Zyxel's
++  DX5401-B0 GPL release. It hands SAE authentication to hostapd, so the
++  access points offer WPA3. It is installed under the board-specific name
++  brcmfmac tries first, so other boards keep the linux-firmware build.
 +endef
 +
 +define Build/Compile
