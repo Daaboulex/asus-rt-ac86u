@@ -24,7 +24,8 @@ nix run .#openwrt-build -- rt-ac86u
 ```
 
 Images land in `.devshell/openwrt/bin/targets/bcm4908/generic/`. A first build
-takes tens of gigabytes and runs best on a many-core x86_64 machine.
+takes tens of gigabytes and runs on x86_64 and aarch64 Linux, fastest with many
+cores.
 
 The build stops, naming the patch, when a patch has no hunk, does not apply,
 or applies in reverse, which means OpenWrt has merged it and it has to leave

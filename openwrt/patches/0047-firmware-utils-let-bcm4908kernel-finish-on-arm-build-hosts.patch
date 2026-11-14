@@ -1,0 +1,40 @@
+diff --git a/tools/firmware-utils/Makefile b/tools/firmware-utils/Makefile
+index da84e6f..3009719 100644
+--- a/tools/firmware-utils/Makefile
++++ b/tools/firmware-utils/Makefile
+@@ -7,7 +7,7 @@
+ include $(TOPDIR)/rules.mk
+ 
+ PKG_NAME:=firmware-utils
+-PKG_RELEASE:=1
++PKG_RELEASE:=2
+ 
+ PKG_SOURCE_PROTO:=git
+ PKG_SOURCE_URL=$(PROJECT_GIT)/project/firmware-utils.git
+diff --git a/tools/firmware-utils/patches/001-bcm4908kernel-hold-the-getopt-result-in-an-int.patch b/tools/firmware-utils/patches/001-bcm4908kernel-hold-the-getopt-result-in-an-int.patch
+new file mode 100644
+index 0000000..95656fe
+--- /dev/null
++++ b/tools/firmware-utils/patches/001-bcm4908kernel-hold-the-getopt-result-in-an-int.patch
+@@ -0,0 +1,21 @@
++Subject: [PATCH] bcm4908kernel: hold the getopt result in an int
++
++getopt() returns an int, -1 once the options run out. Kept in a char,
++that -1 never compares equal on hosts where char is unsigned, as on
++arm64 and arm Linux, so the option loop never ends and an image build
++hangs in bcm4908kernel. Keep it in an int.
++
++---
++diff --git a/src/bcm4908kernel.c b/src/bcm4908kernel.c
++index eaf04a0..4013ba0 100644
++--- a/src/bcm4908kernel.c
+++++ b/src/bcm4908kernel.c
++@@ -49,7 +49,7 @@ int main(int argc, char **argv) {
++ 	size_t length;
++ 	size_t bytes;
++ 	int err = 0;
++-	char c;
+++	int c;
++ 
++ 	if (argc >= 2 && !strcmp(argv[1], "-h")) {
++ 		usage();

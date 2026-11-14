@@ -22,7 +22,8 @@ nix run .#openwrt-build -- rt-ac86u
 ```
 
 The image lands in `.devshell/openwrt/bin/targets/bcm4908/generic/`. A first
-build takes tens of gigabytes and runs best on a many-core x86_64 machine.
+build takes tens of gigabytes and runs on x86_64 and aarch64 Linux, fastest
+with many cores.
 Note the image's SHA256, as `sha256sum` prints it.
 
 Then put the image on the router through rescue mode:
