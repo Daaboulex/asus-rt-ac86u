@@ -24,6 +24,9 @@ where = ["src"]
 pythonpath = ["src"]
 testpaths = ["tests"]
 
+[tool.mutmut]
+source_paths = ["src/"]
+
 [tool.ruff]
 target-version = "py312"
 line-length = 100

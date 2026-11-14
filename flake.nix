@@ -57,6 +57,11 @@
             '';
         in
         {
+          std.detect.mutation-python = {
+            mode = "report";
+            paths = [ "src" ];
+          };
+
           pre-commit.settings.hooks.trim-trailing-whitespace.excludes = [ "^openwrt/patches/" ];
           pre-commit.settings.hooks.end-of-file-fixer.excludes = [ "^openwrt/patches/" ];
           pre-commit.settings.hooks.typos.settings.config.default.extend-identifiers.MODULE_PARM_DESC =
