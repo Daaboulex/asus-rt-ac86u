@@ -1,0 +1,46 @@
+diff --git a/package/kernel/mac80211/Makefile b/package/kernel/mac80211/Makefile
+index 3866d3f..8f267ec 100644
+--- a/package/kernel/mac80211/Makefile
++++ b/package/kernel/mac80211/Makefile
+@@ -12,7 +12,7 @@ PKG_NAME:=mac80211
+ 
+ PKG_SOURCE_VERSION:=7.2
+ PKG_VERSION:=$(subst -,_,$(PKG_SOURCE_VERSION))
+-PKG_RELEASE:=27
++PKG_RELEASE:=28
+ PKG_LICENSE:=GPL-2.0-only
+ PKG_LICENSE_FILES:=COPYING
+ 
+diff --git a/package/kernel/mac80211/patches/brcm/896-wifi-brcmfmac-return-an-invalid-flowring-id-when-none-can-be-created.patch b/package/kernel/mac80211/patches/brcm/896-wifi-brcmfmac-return-an-invalid-flowring-id-when-none-can-be-created.patch
+new file mode 100644
+index 0000000..c4ce6a3
+--- /dev/null
++++ b/package/kernel/mac80211/patches/brcm/896-wifi-brcmfmac-return-an-invalid-flowring-id-when-none-can-be-created.patch
+@@ -0,0 +1,27 @@
++From: Daaboulex <39669593+Daaboulex@users.noreply.github.com>
++Subject: [PATCH] wifi: brcmfmac: return an invalid flowring id when none can be created
++
++brcmf_flowring_create() returns -ENOMEM when every flowring is in use
++or a ring cannot be allocated, but its caller tests the result only
++against BRCMF_FLOWRING_INVALID_ID. The error then passes as a flowid:
++the transmit path enqueues on flow->rings[] and the create worker
++indexes the msgbuf rings with it, both far past their arrays. Return
++BRCMF_FLOWRING_INVALID_ID, which the caller already handles.
++
++---
++--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/flowring.c
+++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/flowring.c
++@@ -143,11 +143,11 @@
++ 				break;
++ 		}
++ 		if (i == flow->nrofrings)
++-			return -ENOMEM;
+++			return BRCMF_FLOWRING_INVALID_ID;
++ 
++ 		ring = kzalloc_obj(*ring, GFP_ATOMIC);
++ 		if (!ring)
++-			return -ENOMEM;
+++			return BRCMF_FLOWRING_INVALID_ID;
++ 
++ 		memcpy(hash[hash_idx].mac, mac, ETH_ALEN);
++ 		hash[hash_idx].fifo = fifo;
