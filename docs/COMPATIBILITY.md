@@ -95,9 +95,16 @@ the line says so.
   transmit power target (9 dBm per chain), chains and core masks on 10.28.2
   and 10.10.131.81, and the board's calibration carries per-rate offsets
   for legacy rates on 5 GHz, so a client farther away may find the 5 GHz
-  networks later than before. What lowers the beacons in the 10.10.131
-  builds is open. 10.28.2 and 10.10.131.81 offer the identical channel and
-  power table, 42 entries.
+  networks later than before. On 10.10.131.116 the drop covers every
+  legacy OFDM frame on 5 GHz, not the beacons alone: on 2026-11-14 a client
+  read the access point's data at -64 to -69 dBm at VHT rates and at -78 dBm
+  with the 5 GHz unicast rate forced to 6 Mbit/s (`5g_rate` 12), back to
+  -55 to -71 dBm on auto. Neither a lower transmit power cap nor a beacon
+  offset of 6 dB (`bcnprs_txpwr_offset`) moved the 5 GHz beacons, and the
+  firmware refuses any country but the one it runs, so its regulatory
+  table cannot be swapped to test a locale's legacy limits. Which power
+  table 10.10.131 uses for legacy OFDM on 5 GHz is open. 10.28.2 and
+  10.10.131.81 offer the identical channel and power table, 42 entries.
 - Protected management frames (802.11w) work, optional, on every network.
   The firmware builds the RSN element of beacons and probe responses
   itself from what brcmfmac passes, hostapd sends its own in message 3 of
