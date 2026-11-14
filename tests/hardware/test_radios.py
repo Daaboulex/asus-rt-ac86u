@@ -110,6 +110,7 @@ def test_channel_survey_reports_each_channels_own_noise(router):
 
 def test_station_dump_carries_signal_rates_and_counters(router):
     checked = []
+    rated = []
     for ap in access_points(router):
         interface = ap.removeprefix("hostapd.")
         dump = router.run(f"iw dev {interface} station dump")
@@ -119,8 +120,10 @@ def test_station_dump_carries_signal_rates_and_counters(router):
             for field in ("signal:", "tx bitrate:", "rx bitrate:", "rx bytes:", "tx packets:"):
                 assert field in block, f"{interface}: no {field!r} in\n{block}"
             checked.append(interface)
+            rated.extend(re.findall(r"(?m)^\s*[tr]x bitrate:.*\bMCS\b.*$", block))
     if not checked:
         pytest.skip("no station is associated")
+    assert rated, "no station reports an HT or VHT rate with its MCS"
 
 
 def hostapd_bss(router, interface: str) -> dict[str, str]:

@@ -1,0 +1,108 @@
+diff --git a/package/kernel/mac80211/Makefile b/package/kernel/mac80211/Makefile
+index 053348b..49064b6 100644
+--- a/package/kernel/mac80211/Makefile
++++ b/package/kernel/mac80211/Makefile
+@@ -12,7 +12,7 @@ PKG_NAME:=mac80211
+ 
+ PKG_SOURCE_VERSION:=7.2
+ PKG_VERSION:=$(subst -,_,$(PKG_SOURCE_VERSION))
+-PKG_RELEASE:=23
++PKG_RELEASE:=24
+ PKG_LICENSE:=GPL-2.0-only
+ PKG_LICENSE_FILES:=COPYING
+ 
+diff --git a/package/kernel/mac80211/patches/brcm/893-wifi-brcmfmac-report-the-mcs-streams-and-width-of-station-rates.patch b/package/kernel/mac80211/patches/brcm/893-wifi-brcmfmac-report-the-mcs-streams-and-width-of-station-rates.patch
+new file mode 100644
+index 0000000..69a8db3
+--- /dev/null
++++ b/package/kernel/mac80211/patches/brcm/893-wifi-brcmfmac-report-the-mcs-streams-and-width-of-station-rates.patch
+@@ -0,0 +1,89 @@
++From: Daaboulex <39669593+Daaboulex@users.noreply.github.com>
++Subject: [PATCH] wifi: brcmfmac: report the MCS, streams and width of station rates
++
++get_station reports a station's last rates as a bare bitrate, so user
++space shows 866.7 Mbit/s for a VHT80 two-stream link with short guard
++interval but cannot tell MCS, streams, width or guard interval apart.
++Station info version 7 and later, version 8 included at the same
++offsets, carries the rate spec of the last frame each way: its encoding
++(legacy, HT or VHT), MCS, stream count, bandwidth and short GI bit.
++
++Decode HT and VHT rate specs into the rate info and fall back to the
++bitrate for legacy rates and older records.
++
++---
++--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.c
+++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.c
++@@ -3171,6 +3171,48 @@
++ 	return 0;
++ }
++ 
+++#define BRCMF_RSPEC_RATE		GENMASK(7, 0)
+++#define BRCMF_RSPEC_VHT_MCS		GENMASK(3, 0)
+++#define BRCMF_RSPEC_VHT_NSS		GENMASK(7, 4)
+++#define BRCMF_RSPEC_BW			GENMASK(18, 16)
+++#define BRCMF_RSPEC_SGI			BIT(23)
+++#define BRCMF_RSPEC_ENCODING		GENMASK(25, 24)
+++#define BRCMF_RSPEC_ENCODING_HT		1
+++#define BRCMF_RSPEC_ENCODING_VHT	2
+++
+++static bool brcmf_rspec_to_rate_info(u32 rspec, struct rate_info *rate)
+++{
+++	static const u8 bws[] = {
+++		[1] = RATE_INFO_BW_20,
+++		[2] = RATE_INFO_BW_40,
+++		[3] = RATE_INFO_BW_80,
+++		[4] = RATE_INFO_BW_160,
+++	};
+++	u32 bw = FIELD_GET(BRCMF_RSPEC_BW, rspec);
+++
+++	if (!bw || bw >= ARRAY_SIZE(bws))
+++		return false;
+++
+++	switch (FIELD_GET(BRCMF_RSPEC_ENCODING, rspec)) {
+++	case BRCMF_RSPEC_ENCODING_HT:
+++		rate->flags = RATE_INFO_FLAGS_MCS;
+++		rate->mcs = FIELD_GET(BRCMF_RSPEC_RATE, rspec);
+++		break;
+++	case BRCMF_RSPEC_ENCODING_VHT:
+++		rate->flags = RATE_INFO_FLAGS_VHT_MCS;
+++		rate->mcs = FIELD_GET(BRCMF_RSPEC_VHT_MCS, rspec);
+++		rate->nss = FIELD_GET(BRCMF_RSPEC_VHT_NSS, rspec);
+++		break;
+++	default:
+++		return false;
+++	}
+++
+++	rate->bw = bws[bw];
+++	if (rspec & BRCMF_RSPEC_SGI)
+++		rate->flags |= RATE_INFO_FLAGS_SHORT_GI;
+++	return true;
+++}
+++
++ static s32
++ brcmf_cfg80211_get_station(struct wiphy *wiphy, struct wireless_dev *wdev,
++ 			   const u8 *mac, struct station_info *sinfo)
++@@ -3237,13 +3279,19 @@
++ 		sinfo->rx_packets += le32_to_cpu(sta_info_le.rx_mcast_pkts);
++ 		if (sinfo->tx_packets) {
++ 			sinfo->filled |= BIT_ULL(NL80211_STA_INFO_TX_BITRATE);
++-			sinfo->txrate.legacy =
++-				le32_to_cpu(sta_info_le.tx_rate) / 100;
+++			if (le16_to_cpu(sta_info_le.ver) < 7 ||
+++			    !brcmf_rspec_to_rate_info(le32_to_cpu(sta_info_le.v7.tx_rspec),
+++						      &sinfo->txrate))
+++				sinfo->txrate.legacy =
+++					le32_to_cpu(sta_info_le.tx_rate) / 100;
++ 		}
++ 		if (sinfo->rx_packets) {
++ 			sinfo->filled |= BIT_ULL(NL80211_STA_INFO_RX_BITRATE);
++-			sinfo->rxrate.legacy =
++-				le32_to_cpu(sta_info_le.rx_rate) / 100;
+++			if (le16_to_cpu(sta_info_le.ver) < 7 ||
+++			    !brcmf_rspec_to_rate_info(le32_to_cpu(sta_info_le.v7.rx_rspec),
+++						      &sinfo->rxrate))
+++				sinfo->rxrate.legacy =
+++					le32_to_cpu(sta_info_le.rx_rate) / 100;
++ 		}
++ 		if (le16_to_cpu(sta_info_le.ver) >= 4) {
++ 			sinfo->filled |= BIT_ULL(NL80211_STA_INFO_TX_BYTES);
