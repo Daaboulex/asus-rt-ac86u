@@ -1,0 +1,50 @@
+diff --git a/package/firmware/brcmfmac-firmware-4366c0-pcie-rt-ac86u/Makefile b/package/firmware/brcmfmac-firmware-4366c0-pcie-rt-ac86u/Makefile
+index b36effa..398346f 100644
+--- a/package/firmware/brcmfmac-firmware-4366c0-pcie-rt-ac86u/Makefile
++++ b/package/firmware/brcmfmac-firmware-4366c0-pcie-rt-ac86u/Makefile
+@@ -4,7 +4,7 @@
+ 
+ PKG_NAME:=brcmfmac-firmware-4366c0-pcie-rt-ac86u
+ PKG_VERSION:=10.10.131.116
+-PKG_RELEASE:=1
++PKG_RELEASE:=2
+ 
+ include $(INCLUDE_DIR)/package.mk
+ 
+@@ -12,6 +12,10 @@
+ GPL_COMMIT:=5df85c8c423ee935eed37b81f0d76dc569e2deb0
+ GPL_DONGLE:=package/base-files-prebuild/files/rootfs/etc/wlan/dhd/4366c0
+ 
++BEACON_BACKOFF_CLAMP_AT:=0x3a554
++BEACON_BACKOFF_CLAMP_WAS:=a3f11404
++BEACON_BACKOFF_CLAMP_IS:=\000\044\000\044
++
+ define Download/rtecdc
+   URL:=https://raw.githubusercontent.com/$(GPL_REPO)/$(GPL_COMMIT)/$(GPL_DONGLE)
+   URL_FILE:=rtecdc.bin
+@@ -31,18 +35,22 @@
+   Broadcom's BCA dongle firmware for the BCM4366c0, build 10.10.131.116,
+   the newest published access point build, from a mirror of Zyxel's
+   DX5401-B0 GPL release. It hands SAE authentication to hostapd, so the
+-  access points offer WPA3. It is installed under the board-specific name
++  access points offer WPA3. One instruction is changed so that beacons and
++  probe responses under a low transmit power cap go out at the cap instead
++  of at the largest backoff. It is installed under the board-specific name
+   brcmfmac tries first, so other boards keep the linux-firmware build.
+ endef
+ 
+ define Build/Compile
+-	true
++	cp $(DL_DIR)/$(PKG_NAME)-$(PKG_VERSION).bin $(PKG_BUILD_DIR)/rtecdc.bin
++	[ "$$$$(od -An -tx1 -j $$$$(($(BEACON_BACKOFF_CLAMP_AT))) -N4 $(PKG_BUILD_DIR)/rtecdc.bin | tr -d ' \n')" = "$(BEACON_BACKOFF_CLAMP_WAS)" ]
++	printf '$(BEACON_BACKOFF_CLAMP_IS)' | dd of=$(PKG_BUILD_DIR)/rtecdc.bin bs=1 seek=$$$$(($(BEACON_BACKOFF_CLAMP_AT))) conv=notrunc status=none
+ endef
+ 
+ define Package/brcmfmac-firmware-4366c0-pcie-rt-ac86u/install
+ 	$(INSTALL_DIR) $(1)/lib/firmware/brcm
+ 	$(INSTALL_DATA) \
+-		$(DL_DIR)/$(PKG_NAME)-$(PKG_VERSION).bin \
++		$(PKG_BUILD_DIR)/rtecdc.bin \
+ 		$(1)/lib/firmware/brcm/brcmfmac4366c-pcie.asus,rt-ac86u.bin
+ endef
+ 
