@@ -180,6 +180,9 @@ files in [`openwrt/patches`](../openwrt/patches), applied in file-name order.
 | 7 | Radio calibration | OpenWrt `base-files/lib/preinit/81_brcmfmac_nvram` | After the overlay mounts and before modules load, the hook mounts `data` read-only and writes the `devpath` and numbered keys as the board NVRAM, once; brcmfmac's multi-radio format picks each radio by PCIe domain. A firmware hotplug hook cannot work here: brcmfmac requests the board NVRAM without the user-mode fallback, so procd never sees the request. |
 | 8 | Flash partition fix | Linux or OpenWrt pending, see openwrt/openwrt#26197 | The cfe-bootfs parser error on the inactive slot is fatal since 6.12. Fixed at its cause, for every bcm4908 board. |
 
+Where the rest of the series would go upstream, and what a submission still
+needs, is in [`UPSTREAMING.md`](./UPSTREAMING.md).
+
 ## Left out of the reference fork, and why
 
 Read from `5ocworkshop/openwrt` at `rtac86u-25.12.6`; used as a map of the

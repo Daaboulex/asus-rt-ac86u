@@ -142,6 +142,8 @@ Try these in order, lightest first.
   built, and what each stage of an update proves.
 - [docs/DESIGN.md](docs/DESIGN.md): how the port is built, what it
   guarantees, and the hardware facts read from the unit.
+- [docs/UPSTREAMING.md](docs/UPSTREAMING.md): where each patch would go
+  upstream and what a submission still needs.
 - [CHANGELOG.md](CHANGELOG.md)
 
 ## License
