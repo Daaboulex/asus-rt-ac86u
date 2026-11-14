@@ -51,8 +51,11 @@ the line says so.
   `AKM_NOT_SUPPORTED` (patches 0027 to 0029).
 - WPA3-Personal works with firmware 10.10.131.81 (r796181, 2021), the
   4366c0 build of Broadcom's AX SDK in the asuswrt-merlin.ng GPL tree
-  (`impl69/sys/src/dongle/bin/4366c0/rtecdc.bin`), which the image does
-  not ship yet. That firmware hands each received SAE Authentication frame
+  (`impl69/sys/src/dongle/bin/4366c0/rtecdc.bin`). The image ships it as
+  package `brcmfmac-firmware-4366c0-pcie-rt-ac86u`, fetched from that tree
+  at a pinned commit by its SHA-256 and installed under the board-specific
+  name brcmfmac loads first, so other 4366 boards keep linux-firmware's
+  10.28.2. That firmware hands each received SAE Authentication frame
   to the host as a `WLC_E_AUTH` event and sends the host's reply through
   `WLC_SCB_AUTHENTICATE`; brcmfmac patch 886 routes both to and from
   hostapd, which runs SAE itself. The firmware also sets the
@@ -60,18 +63,35 @@ the line says so.
   EAPOL included, left with a broken header. On 2026-11-13 an ath12k
   laptop and an Android phone joined the WPA2/WPA3 mixed 5 GHz network
   with SAE (`auth_alg=sae`, MFP on) and WPA2 clients joined the same
-  network. SAE runs hunting-and-pecking only: 10.10.131.81 has no `rsnxe`
-  iovar, refuses element 244 through its `ie` iovar and rewrites it to a
-  vendor element through `vndr_ie`, so the beacon cannot announce
-  hash-to-element and `sae_pwe` must be 0. Firmware 10.10.131.116
+  network; on 2026-11-14 SAE joins succeeded on all four networks, both
+  bands, main and VPN. SAE runs hunting-and-pecking only: 10.10.131.81 has
+  no `rsnxe` iovar, refuses element 244 through its `ie` iovar and rewrites
+  it to a vendor element through `vndr_ie`, so the beacon cannot announce
+  hash-to-element. The wifi scripts therefore default `sae_pwe` to 0 on
+  brcmfmac radios (patch 0037), which keeps clients that support H2E from
+  being refused for not using it; an explicit `sae_pwe` still wins.
+  Restarting one access point used to stop the beacons of the other on
+  the same radio, so a `wifi reload` that changed a setting hid a network
+  while hostapd reported it enabled; patch 892 brings them back. Firmware
+  10.10.131.116
   (r811008, 2024, Zyxel DX5401-B0 GPL) has the `rsnxe` iovar, and with
   patch 889 its beacons carried the element hostapd built; but on it SAE
-  itself failed for both methods on 2026-11-13, so it is not used. Beacon
+  itself fails for both methods: hostapd accepts the client's confirm and
+  sends its own, and the client never associates, the same with the fixed
+  interface handling of patch 890, so it is not used. Beacon
   protection (BIGTK) and Transition Disable are in no 4366c0 firmware
   found. A client that runs SAE in its own firmware (BCM4387 under Asahi
   Linux with wpa_supplicant) failed SAE against this access point and
   against an ISP router offering WPA3 alike, a known limit of that
   client, so it cannot test WPA3 here.
+- On firmware 10.10.131.81 the 5 GHz beacons arrive much weaker than on
+  10.28.2: on 2026-11-14 a client read them at -73 dBm against -45 dBm at
+  the same spot, while 2.4 GHz beacons read -41 dBm on both and 5 GHz data
+  frames stayed at -44 to -55 dBm and 780 to 866 Mbit/s. The firmware
+  reports the same transmit power target (9 dBm per chain), chains and
+  core masks on both builds, so a client farther away may find the 5 GHz
+  networks later than before; the cause is not known yet. Both firmwares
+  offer the identical channel and power table, 42 entries.
 - Protected management frames (802.11w) work, optional, on every network.
   The firmware builds the RSN element of beacons and probe responses
   itself from what brcmfmac passes, hostapd sends its own in message 3 of
