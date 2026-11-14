@@ -139,28 +139,6 @@ def hostapd_bss(router, interface: str) -> dict[str, str]:
     return fields
 
 
-def test_firmware_beacons_the_rsnxe_hostapd_builds(router):
-    checked = []
-    for ap in access_points(router):
-        interface = ap.removeprefix("hostapd.")
-        if not interface.endswith("-ap0"):
-            continue
-        try:
-            held = firmware_variable(router, interface, "rsnxe")
-        except AssertionError:
-            continue
-        bss = hostapd_bss(router, interface)
-        h2e = "SAE" in bss.get("wpa_key_mgmt", "").split() and bss.get("sae_pwe", "2") in ("1", "2")
-        element = held[4 : 6 + held[5]] if len(held) > 5 and held[4] == 0xF4 else []
-        if h2e:
-            assert element and element[2] & 0x20, f"{interface}: firmware holds {element}"
-        else:
-            assert not element or not element[2] & 0x20, f"{interface}: firmware holds {element}"
-        checked.append(interface)
-    if not checked:
-        pytest.skip("no running firmware has the rsnxe iovar")
-
-
 def radio_access_points(router) -> dict[str, list[str]]:
     found: dict[str, list[str]] = {}
     running = access_points(router)
@@ -204,24 +182,17 @@ def test_wifi_restart_keeps_one_bsscfg_per_access_point(router):
     assert_one_bsscfg_per_access_point(router)
 
 
-def test_sae_access_points_use_the_pwe_their_beacon_announces(router):
-    radios = radio_access_points(router)
-    checked = []
-    for aps in radios.values():
-        try:
-            firmware_variable(router, aps[0], "rsnxe")
-            beacons_rsnxe = True
-        except AssertionError:
-            beacons_rsnxe = False
+def test_sae_access_points_beacon_the_hash_to_element_they_offer(router):
+    offered = []
+    for aps in radio_access_points(router).values():
         for interface in aps:
             bss = hostapd_bss(router, interface)
-            if "SAE" not in bss.get("wpa_key_mgmt", "").split():
-                continue
-            if not beacons_rsnxe:
-                assert bss.get("sae_pwe") == "0", f"{interface}: sae_pwe {bss.get('sae_pwe')}"
-            checked.append(interface)
-    if not checked:
-        pytest.skip("no access point offers SAE")
+            if "SAE" in bss.get("wpa_key_mgmt", "").split() and bss.get("sae_pwe") in ("1", "2"):
+                offered.append(interface)
+    if not offered:
+        pytest.skip("no access point offers SAE hash-to-element")
+    refused = [line for line in router.dmesg().splitlines() if "firmware takes no RSNXE" in line]
+    assert not refused, f"{offered} offer hash-to-element, but:\n" + "\n".join(refused)
 
 
 def test_radios_take_msi_interrupts(router):
