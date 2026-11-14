@@ -56,7 +56,11 @@ in the package build; the tests in `tests/hardware` run against a router.
   `adb_enabled` off and `https-dns-proxy` with no resolver and its forced
   DNS and canary domains off, held by `test_dns_services_ship_switched_off`;
   the `openwrt-shipped-defaults` check fails when upstream changes either
-  default under them. `miniupnpd` ships with `enabled` off, held by
+  default under them. `uhttpd` ships upstream's configuration with
+  `redirect_https` on, so a LuCI login never crosses the LAN in clear
+  text, held by `test_luci_over_http_redirects_to_https` and the same
+  check; a sysupgrade keeps a unit's own `uhttpd` file, so a unit
+  installed before this default needs the option set once. `miniupnpd` ships with `enabled` off, held by
   `test_added_service_ships_switched_off`, and `qosify` with its WAN
   interface and device disabled, held by `test_qosify_ships_shaping_nothing`.
 - A transmit power set for a radio caps every chain in its firmware:

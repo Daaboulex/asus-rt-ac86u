@@ -1,5 +1,6 @@
 import json
 import ssl
+import urllib.error
 import urllib.request
 
 
@@ -27,3 +28,19 @@ def test_luci_is_served_over_https(router):
     context.verify_mode = ssl.CERT_NONE
     with urllib.request.urlopen(f"https://{router.host}/", context=context, timeout=15) as reply:
         assert reply.status == 200
+
+
+class KeepRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+def test_luci_over_http_redirects_to_https(router):
+    opener = urllib.request.build_opener(KeepRedirect)
+    try:
+        opener.open(f"http://{router.host}/", timeout=15)
+    except urllib.error.HTTPError as reply:
+        assert reply.code in (301, 302, 307, 308), f"plain HTTP answered {reply.code}"
+        assert reply.headers["Location"].startswith("https://")
+        return
+    raise AssertionError("plain HTTP served LuCI without redirecting to HTTPS")

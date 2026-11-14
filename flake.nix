@@ -147,6 +147,7 @@
           checks.openwrt-shipped-defaults =
             let
               upstream = inputs.openwrt-packages;
+              core = inputs.openwrt;
               ours = ./openwrt/files/etc/config;
             in
             pkgs.runCommand "openwrt-shipped-defaults" { } ''
@@ -159,6 +160,9 @@
                 | sed -E "s/option (canary_domains_icloud|canary_domains_mozilla|force_dns) '1'/option \1 '0'/" \
                 > https-dns-proxy.expected
               diff -u https-dns-proxy.expected ${ours}/https-dns-proxy
+              options ${core}/package/network/services/uhttpd/files/uhttpd.config \
+                | sed -E 's/(option redirect_https\t)0/\11/' > uhttpd.expected
+              diff -u uhttpd.expected ${ours}/uhttpd
               touch "$out"
             '';
 
