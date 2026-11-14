@@ -20,15 +20,16 @@ the line says so.
   `brcmfmac-firmware-4366c0-pcie-rt-ac86u`,
   `test_both_radios_start_their_firmware` checks that both start, and
   `test_radios_run_the_board_firmware_package` that they run that package.
-- The radios do not run on German or EU limits. Both radios' firmware runs
-  Broadcom's worldwide locale `XT` and ignores the country `E0` and revision
-  `962` in the unit's NVRAM. `brcmfmac` passes a configured country to the
-  firmware only through a `brcm,ccode-map`, which this board does not have,
-  and linux-firmware ships no CLM file for the 4366c. A transmit power of
-  9 dBm on each radio (`uci set wireless.radio0.txpower=9`, the same for
-  `radio1`) keeps the radios within the German limits, which follow the
-  EU's: 19.9 dBm EIRP at 2.4 GHz and 22.6 dBm on channels 36 to 48,
-  counting the beamforming gain of three and four chains and the antenna
+- The radios do not run on a country's limits, the EU's included. Both
+  radios' firmware runs Broadcom's worldwide locale `XT` and ignores the
+  country `E0` and revision `962` in the unit's NVRAM. `brcmfmac` passes a
+  configured country to the firmware only through a `brcm,ccode-map`, which
+  this board does not have, and linux-firmware ships no CLM file for the
+  4366c. A transmit power of 9 dBm on each radio
+  (`uci set wireless.radio0.txpower=9`, the same for `radio1`) keeps the
+  radios within the EU limits: 19.9 dBm EIRP at 2.4 GHz and 22.6 dBm on
+  channels 36 to 48, counting the beamforming gain of three and four
+  chains and the antenna
   gain under "Hardware facts" in [`DESIGN.md`](./DESIGN.md). On 2026-11-12
   the cap read back as 9 dBm on every chain of both radios through the
   firmware's `txpwr_target_max`. The image ships `iw-full` for that
@@ -69,8 +70,8 @@ the line says so.
   frame it sends, EAPOL included, left with a broken header. Patch 889 puts
   the RSNXE hostapd builds into the beacons through the firmware's `rsnxe`
   iovar, so with OpenWrt's default `sae_pwe` of 2 the beacons announce
-  hash-to-element. On 2026-11-14 an ath12k laptop with wpa_supplicant
-  joined all four networks, both bands, main and VPN, with SAE
+  hash-to-element. On 2026-11-14 a Linux client with wpa_supplicant
+  joined all four networks, two on each band, with SAE
   (`auth_alg=sae`, MFP on), before and after a `wifi down` and `wifi up`;
   a client scan read element 244 with the H2E bit in all four beacons, and
   hostapd logged hash-to-element commits on both main networks. A WPA2
@@ -82,10 +83,7 @@ the line says so.
   no `rsnxe` iovar, so its beacons cannot announce hash-to-element, and a
   client that supports it is refused for not using it unless `sae_pwe` is
   0. Beacon protection (BIGTK) and Transition Disable are in no 4366c0
-  firmware found. A client that runs SAE in its own firmware (BCM4387 under Asahi
-  Linux with wpa_supplicant) failed SAE against this access point and
-  against an ISP router offering WPA3 alike, a known limit of that
-  client, so it cannot test WPA3 here.
+  firmware found.
 - On firmware 10.10.131.81 and 10.10.131.116 the 5 GHz beacons arrive much
   weaker than on 10.28.2. On 2026-11-14 a client at one spot averaged five
   scans per firmware: 5 GHz beacons read -45 dBm on 10.28.2, -73 dBm on
@@ -113,7 +111,7 @@ the line says so.
   The firmware builds the RSN element of beacons and probe responses
   itself from what brcmfmac passes, hostapd sends its own in message 3 of
   the 4-way handshake, and a client aborts with reason 17 when the two
-  differ by a byte, which phones report as a wrong password. A handshake
+  differ by a byte, which clients report as a wrong password. A handshake
   trace on 2026-11-13 showed two differences. hostapd left out the
   BIP-CMAC-128 management cipher field the firmware always writes, which
   hostapd patch
@@ -251,7 +249,7 @@ the line says so.
 Each figure names how it was taken, on 2026-11-12 and 13, with both
 radios capped at 9 dBm per chain.
 
-- Wi-Fi link to a phone, from `iw dev <ap> station dump`: 975 to
+- Wi-Fi link to a client, from `iw dev <ap> station dump`: 975 to
   1083 Mbit/s on 5 GHz at 80 MHz with -44 to -49 dBm of signal, and 520 to
   650 Mbit/s at -67 to -69 dBm through an outside wall; 192 Mbit/s on
   2.4 GHz at 20 MHz close by, carrying about 100 Mbit/s of TCP. Close to
@@ -272,7 +270,7 @@ radios capped at 9 dBm per chain.
   2026-11-13.
 - Station statistics on firmware 10.10.131.81: its `sta_info` is version
   8, 352 bytes, and the firmware leaves out signal, rates and counters
-  when the host's buffer is smaller. With patch 888 a laptop on 5 GHz
+  when the host's buffer is smaller. With patch 888 a client on 5 GHz
   showed -48 dBm over four chains and 866.6 Mbit/s both ways in
   `iw dev <ap> station dump` on 2026-11-13.
 - Upload lag behind an upstream modem: two parallel `curl` uploads from the
@@ -282,7 +280,7 @@ radios capped at 9 dBm per chain.
   `linklayer ethernet` and `overhead 34`, held it at 15 to 16 ms, 28 ms at
   worst, for about 12 % less upload throughput. A saturating download
   raised the ping by about 13 ms unshaped, so the download is left
-  unshaped. Routed through the router's NAT from a laptop on its 5 GHz,
+  unshaped. Routed through the router's NAT from a client on its 5 GHz,
   a saturating upload kept the ping at 16.7 ms on average against 16.9 ms
   idle, so the shaping holds for forwarded traffic too. `qosify` in place
   of `sqm-scripts`, at the same rate with `overhead_type manual`,
@@ -290,16 +288,16 @@ radios capped at 9 dBm per chain.
   16.1 ms on average under a saturating upload across three runs on
   2026-11-13, against 15.0 ms for `sqm-scripts` the same hour, while
   sorting traffic into four priority tins.
-- Wi-Fi to the router itself, from a laptop on 5 GHz at -45 dBm with an
+- Wi-Fi to the router itself, from a client on 5 GHz at -45 dBm with an
   866 Mbit/s link, `iperf3 -P 4` against `iperf3 -s` on the router: 644
-  Mbit/s from the laptop and 544 Mbit/s to it, with both cores about 60 %
+  Mbit/s from the client and 544 Mbit/s to it, with both cores about 60 %
   busy. Moving the 5 GHz radio's interrupt to core 1
   (`/proc/irq/23/smp_affinity` 2) dropped the upload to 477 Mbit/s with
   core 1 at 96 %. Both were measured on the radios' legacy INTx line;
   they now take MSI vectors, which the PCIe controller's MSI domain
   gives no affinity.
 - Routing load: 164 to 200 Mbit/s of download through NAT from that
-  laptop kept the router about 30 % busy, and software flow offload
+  client kept the router about 30 % busy, and software flow offload
   (`flow_offloading` 1) changed neither the rate nor the load, so it
   stays off. No wired client has measured routing above the internet
   line yet.

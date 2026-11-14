@@ -91,9 +91,10 @@ Three switches open the tests that need more than a look:
 ## Known limits
 
 - The radios run Broadcom's closed firmware; no open firmware exists for them.
-- The radios do not run on German or EU limits: their firmware runs
-  Broadcom's worldwide locale and ignores the country set on the router.
-  A transmit power of 9 dBm on each radio keeps them within those limits.
+- The radios do not run on a country's limits, the EU's included: their
+  firmware runs Broadcom's worldwide locale and ignores the country set on
+  the router. A transmit power of 9 dBm on each radio keeps them within the
+  EU's limits.
 - A radar (DFS) channel cannot carry an access point.
 - On 5 GHz the radio firmware that offers WPA3 sends beacons and every
   frame at a legacy rate far weaker than its fast data, so a distant
