@@ -1,0 +1,12 @@
+diff --git a/target/linux/bcm4908/base-files/lib/preinit/81_brcmfmac_nvram b/target/linux/bcm4908/base-files/lib/preinit/81_brcmfmac_nvram
+index 23d0459..4815523 100644
+--- a/target/linux/bcm4908/base-files/lib/preinit/81_brcmfmac_nvram
++++ b/target/linux/bcm4908/base-files/lib/preinit/81_brcmfmac_nvram
+@@ -23,6 +23,7 @@
+ 				/^devpath[0-9]+=pcie\/[0-9]+\/[0-9]+$/ {
+ 					split($2, path, "/")
+ 					printf "%s=pcie/%d/%s/\n", $1, path[2] + 1, path[3]
++					keys = keys substr($1, 8) ":dhdhdr=0\n"
+ 					next
+ 				}
+ 				/^[0-9]+:/ { keys = keys $0 "\n" }
