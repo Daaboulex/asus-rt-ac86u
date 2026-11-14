@@ -65,7 +65,9 @@
           pre-commit.settings.hooks.typos.settings.config.default.extend-identifiers.nd_enabled =
             "nd_enabled";
           pre-commit.settings.hooks.typos.settings.config.default.extend-ignore-re = [
-            "(?m)^index [0-9a-f]+\\.\\.[0-9a-f]+( [0-7]+)?$"
+            "(?m)^[-+ ]?index [0-9a-f]+\\.\\.[0-9a-f]+( [0-7]+)?$"
+            "(?m)^[-+ ]?@@ -[0-9,]+ \\+[0-9,]+ @@.*$"
+            "\\b[0-9a-f]{12,40}\\b"
           ];
 
           packages.default = pkgs.python312.pkgs.callPackage ./package.nix { };
