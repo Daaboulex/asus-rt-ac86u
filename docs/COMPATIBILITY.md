@@ -65,9 +65,10 @@ the line says so.
   hostapd, which runs SAE itself. It then holds the station's Association
   Request as a `WLC_E_ASSOC` event until the host answers through
   `WLC_SCB_ASSOCIATE`, which patch 894 does; without it the client's
-  association times out and the firmware drops the station. The firmware
-  also sets the host-assisted LLC/SNAP flag, and without patch 887 every
-  frame it sends, EAPOL included, left with a broken header. Patch 889 puts
+  association times out and the firmware drops the station. In its host TX
+  header mode, below, the firmware also sets the host-assisted LLC/SNAP
+  flag, and without patch 887 every frame it sent, EAPOL included, left
+  with a broken header; with the mode off the flag stays clear. Patch 889 puts
   the RSNXE hostapd builds into the beacons through the firmware's `rsnxe`
   iovar, so with OpenWrt's default `sae_pwe` of 2 the beacons announce
   hash-to-element. On 2026-11-14 a Linux client with wpa_supplicant
@@ -107,15 +108,29 @@ the line says so.
   locale's legacy limits. Which power table 10.10.131 uses for legacy
   OFDM on 5 GHz is open. 10.28.2 and
   10.10.131.81 offer the identical channel and power table, 42 entries.
-- On firmware 10.10.131.116 the 2.4 GHz radio's d11 PSM watchdog fires at
-  `vht_features` 7, the value the 2.4 GHz VHT patch 880 leaves. On
-  2026-11-14 one boot logged 25 watchdogs in half an hour, counted from
-  `dmesg`: a burst at bring-up, five within 30 ms at a `wifi down` or
-  `wifi up`, and one after a station left, and the 2.4 GHz clients lost
-  their traffic each time. The router's log stream from 2026-11-10 to 13,
-  on 10.28.2 with patch 880, holds none. Patch 897 sets 1, bit 0 alone; the
-  same image then logged one watchdog at boot and none through two
-  `wifi down` and `wifi up` cycles, each followed for 150 s.
+- Firmware 10.10.131.116 runs both radios in Broadcom's host TX header
+  mode unless the board NVRAM says otherwise: it reads `dhdhdr`, `htxhdr`
+  and `amsdufrag` and takes 1 for each that is absent, and logs the result
+  on its console as `hnd_init: mutxmax -1 dhdhdr 1 htxhdr 1 amsdufrag 1`.
+  Broadcom's own host driver hands the firmware a 768 KiB host buffer for
+  that mode (`BCM_DHDHDR`, 3072 transmit headers of 256 bytes, in DHD's
+  `dhd_msgbuf.c`); brcmfmac hands it an 8-byte scratch buffer. In the mode
+  the 2.4 GHz radio fails under load. On 2026-11-14 a 157 MB download from
+  the router to a client linked at 144 Mbit/s took 20 s at 7.8 MB/s while
+  the radio's console logged `PHYTX error` and 19 d11 PSM watchdog resets;
+  after one of them the radio sent that client nothing for 2.5 minutes,
+  until the client left and rejoined. With `dhdhdr=0` for each radio, which
+  the board NVRAM hook writes, the console reads `dhdhdr 0 htxhdr 0
+  amsdufrag 0`, the shared flags lose bit 21, and on 2026-11-14 three runs
+  of the same download logged no watchdog at 11.0 to 11.8 MB/s and two on
+  5 GHz none at 45 to 46 MB/s. Which part of the mode fails, the transmit
+  headers kept in host memory or the payload fetched from it, is open.
+  10.28.2 has no such mode, and the router's log stream from 2026-11-10 to
+  13 on it holds no watchdog. brcmfmac's multi-radio NVRAM format passes a
+  radio only the keys numbered for it, so a key without a number never
+  reaches the firmware. Patch 897 holds `vht_features` at 1 on 2.4 GHz; it
+  was written for watchdogs counted with the mode on, and whether 7 is
+  stable with the mode off has not been measured.
 - Protected management frames (802.11w) work, optional, on every network.
   The firmware builds the RSN element of beacons and probe responses
   itself from what brcmfmac passes, hostapd sends its own in message 3 of
