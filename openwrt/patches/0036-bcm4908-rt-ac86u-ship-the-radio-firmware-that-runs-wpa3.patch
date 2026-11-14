@@ -1,0 +1,66 @@
+diff --git a/package/firmware/brcmfmac-firmware-4366c0-pcie-rt-ac86u/Makefile b/package/firmware/brcmfmac-firmware-4366c0-pcie-rt-ac86u/Makefile
+new file mode 100644
+index 0000000..6252440
+--- /dev/null
++++ b/package/firmware/brcmfmac-firmware-4366c0-pcie-rt-ac86u/Makefile
+@@ -0,0 +1,47 @@
++# SPDX-License-Identifier: GPL-2.0-or-later
++
++include $(TOPDIR)/rules.mk
++
++PKG_NAME:=brcmfmac-firmware-4366c0-pcie-rt-ac86u
++PKG_VERSION:=10.10.131.81
++PKG_RELEASE:=1
++
++include $(INCLUDE_DIR)/package.mk
++
++MERLIN_COMMIT:=2c4d3ee043bd1c714c341d75a9efa8e77c2955b9
++MERLIN_DONGLE:=release/src-rt-5.02L.07p2axhnd/bcmdrivers/broadcom/net/wl/impl69/sys/src/dongle/bin/4366c0
++
++define Download/rtecdc
++  URL:=https://raw.githubusercontent.com/RMerl/asuswrt-merlin.ng/$(MERLIN_COMMIT)/$(MERLIN_DONGLE)
++  URL_FILE:=rtecdc.bin
++  FILE:=$(PKG_NAME)-$(PKG_VERSION).bin
++  HASH:=3bf9421f6bc14333f14dc7a561095d678d97ec023da22bd2c6772b51b7b428df
++endef
++$(eval $(call Download,rtecdc))
++
++define Package/brcmfmac-firmware-4366c0-pcie-rt-ac86u
++  SECTION:=firmware
++  CATEGORY:=Firmware
++  TITLE:=BCM4366c0 firmware 10.10.131.81 for the ASUS RT-AC86U
++  DEPENDS:=@TARGET_bcm4908
++endef
++
++define Package/brcmfmac-firmware-4366c0-pcie-rt-ac86u/description
++  Broadcom's BCA dongle firmware for the BCM4366c0, build 10.10.131.81 from
++  the asuswrt-merlin.ng GPL tree. It hands SAE authentication to hostapd,
++  so the access points offer WPA3. It is installed under the board-specific
++  name brcmfmac tries first, so other boards keep the linux-firmware build.
++endef
++
++define Build/Compile
++	true
++endef
++
++define Package/brcmfmac-firmware-4366c0-pcie-rt-ac86u/install
++	$(INSTALL_DIR) $(1)/lib/firmware/brcm
++	$(INSTALL_DATA) \
++		$(DL_DIR)/$(PKG_NAME)-$(PKG_VERSION).bin \
++		$(1)/lib/firmware/brcm/brcmfmac4366c-pcie.asus,rt-ac86u.bin
++endef
++
++$(eval $(call BuildPackage,brcmfmac-firmware-4366c0-pcie-rt-ac86u))
+diff --git a/target/linux/bcm4908/image/Makefile b/target/linux/bcm4908/image/Makefile
+index 1bc168c..5b0c34a 100644
+--- a/target/linux/bcm4908/image/Makefile
++++ b/target/linux/bcm4908/image/Makefile
+@@ -103,7 +103,7 @@ define Device/asus_rt-ac86u
+   DEVICE_ALT0_VENDOR := ASUS
+   DEVICE_ALT0_MODEL := RT-AC2900
+   DEVICE_DTS := broadcom/bcmbca/bcm4906-asus-rt-ac86u
+-  DEVICE_PACKAGES := kmod-brcmfmac brcmfmac-firmware-4366c0-pcie wpad-basic-mbedtls
++  DEVICE_PACKAGES := kmod-brcmfmac brcmfmac-firmware-4366c0-pcie-rt-ac86u wpad-basic-mbedtls
+   IMAGES := bin
+   IMAGE_SIZE := 97280k
+   IMAGE/bin := append-ubi | bcm4908img | bcm4908asus | check-size

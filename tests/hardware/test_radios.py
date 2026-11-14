@@ -5,6 +5,7 @@ import pytest
 from conftest import RADIO_2G_SLOT, RADIO_5G_SLOT, phys, radio_section
 
 NVRAM = "/lib/firmware/brcm/brcmfmac4366c-pcie.asus,rt-ac86u.txt"
+BOARD_FIRMWARE_PACKAGE = "brcmfmac-firmware-4366c0-pcie-rt-ac86u"
 GET_VAR_HEADER = [0x06, 0x01, 0, 0, 0x40, 0, 0, 0, 0x14, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 
 
@@ -30,6 +31,14 @@ def test_both_radios_start_their_firmware(router):
     log = router.dmesg()
     assert len(re.findall(r"brcmf_c_preinit_dcmds: Firmware: BCM4366[46]", log)) == 2
     assert set(phys(router)) == {RADIO_2G_SLOT, RADIO_5G_SLOT}
+
+
+def test_radios_run_the_board_firmware_package(router):
+    listing = router.run(f"apk list -I {BOARD_FIRMWARE_PACKAGE} 2>/dev/null; true")
+    shipped = re.search(rf"{BOARD_FIRMWARE_PACKAGE}-(\d+(?:\.\d+)+)-r\d+", listing)
+    assert shipped, f"{BOARD_FIRMWARE_PACKAGE} is not installed: {listing!r}"
+    loaded = re.findall(r"Firmware: BCM4366[46]/\d+ wl0: .* version (\S+) \(r\d+\)", router.dmesg())
+    assert loaded == [shipped.group(1)] * 2, f"loaded {loaded}, shipped {shipped.group(1)}"
 
 
 def test_radio_calibration_comes_from_the_unit(router):
