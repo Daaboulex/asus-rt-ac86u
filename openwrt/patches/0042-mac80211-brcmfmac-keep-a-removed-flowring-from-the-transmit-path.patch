@@ -1,0 +1,111 @@
+diff --git a/package/kernel/mac80211/Makefile b/package/kernel/mac80211/Makefile
+index ba14dee..3866d3f 100644
+--- a/package/kernel/mac80211/Makefile
++++ b/package/kernel/mac80211/Makefile
+@@ -12,7 +12,7 @@ PKG_NAME:=mac80211
+ 
+ PKG_SOURCE_VERSION:=7.2
+ PKG_VERSION:=$(subst -,_,$(PKG_SOURCE_VERSION))
+-PKG_RELEASE:=26
++PKG_RELEASE:=27
+ PKG_LICENSE:=GPL-2.0-only
+ PKG_LICENSE_FILES:=COPYING
+ 
+diff --git a/package/kernel/mac80211/patches/brcm/895-wifi-brcmfmac-keep-a-removed-flowring-from-the-transmit-path.patch b/package/kernel/mac80211/patches/brcm/895-wifi-brcmfmac-keep-a-removed-flowring-from-the-transmit-path.patch
+new file mode 100644
+index 0000000..05713f1
+--- /dev/null
++++ b/package/kernel/mac80211/patches/brcm/895-wifi-brcmfmac-keep-a-removed-flowring-from-the-transmit-path.patch
+@@ -0,0 +1,92 @@
++From: Daaboulex <39669593+Daaboulex@users.noreply.github.com>
++Subject: [PATCH] wifi: brcmfmac: keep a removed flowring from the transmit path
++
++The transmit path of the msgbuf protocol looks a flowring up in the
++hash, creates one when none matches and enqueues on flow->rings[flowid]
++with no lock, neither against itself on another interface nor against
++removal. Two access points transmitting at once can both run
++brcmf_flowring_create() and take the same free slot, leaving two hash
++entries with one flowid. brcmf_flowring_delete(), called when the
++firmware refuses to create a flowring, when its deletion fails or when
++no DMA buffer can be had, clears one hash entry and frees
++flow->rings[flowid] while a transmit on another CPU may still reach it.
++On a BCM4366 access point the firmware refused a flowring for a second
++network as it came up, and a multicast frame the bridge flooded to that
++network 160 ms later oopsed in skb_queue_tail() called from
++brcmf_flowring_enqueue() on a NULL ring.
++
++Give the flowring table a lock: brcmf_flowring_delete() unlinks the
++ring under it, and the msgbuf transmit path holds it across lookup,
++creation and enqueue. Transmit runs in softirq context and removal in
++process context, so the lock only disables bottom halves; the queued
++frames are dropped and the ring freed after it is released.
++
++---
++--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/flowring.h
+++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/flowring.h
++@@ -38,6 +38,8 @@
++ struct brcmf_flowring {
++ 	struct device *dev;
++ 	struct brcmf_flowring_hash hash[BRCMF_FLOWRING_HASHSIZE];
+++	/* protects hash[] and rings[] against concurrent create and delete */
+++	spinlock_t lock;
++ 	spinlock_t block_lock;
++ 	enum proto_addr_mode addr_mode[BRCMF_MAX_IFS];
++ 	u16 nrofrings;
++--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/flowring.c
+++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/flowring.c
++@@ -233,9 +233,12 @@
++ 	u8 ifidx;
++ 	struct sk_buff *skb;
++ 
+++	spin_lock_bh(&flow->lock);
++ 	ring = flow->rings[flowid];
++-	if (!ring)
+++	if (!ring) {
+++		spin_unlock_bh(&flow->lock);
++ 		return;
+++	}
++ 
++ 	ifidx = brcmf_flowring_ifidx_get(flow, flowid);
++ 	ifp = brcmf_get_ifp(bus_if->drvr, ifidx);
++@@ -245,6 +248,7 @@
++ 	flow->hash[hash_idx].ifidx = BRCMF_FLOWRING_INVALID_IFIDX;
++ 	eth_zero_addr(flow->hash[hash_idx].mac);
++ 	flow->rings[flowid] = NULL;
+++	spin_unlock_bh(&flow->lock);
++ 
++ 	skb = skb_dequeue(&ring->skblist);
++ 	while (skb) {
++@@ -364,6 +368,7 @@
++ 	if (flow) {
++ 		flow->nrofrings = nrofrings;
++ 		flow->dev = dev;
+++		spin_lock_init(&flow->lock);
++ 		spin_lock_init(&flow->block_lock);
++ 		for (i = 0; i < ARRAY_SIZE(flow->addr_mode); i++)
++ 			flow->addr_mode[i] = ADDR_INDIRECT;
++--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/msgbuf.c
+++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/msgbuf.c
++@@ -884,17 +884,17 @@
++ 	u32 queue_count;
++ 	bool force;
++ 
+++	spin_lock_bh(&flow->lock);
++ 	flowid = brcmf_flowring_lookup(flow, eh->h_dest, skb->priority, ifidx);
++ 	if (flowid == BRCMF_FLOWRING_INVALID_ID) {
++ 		flowid = brcmf_msgbuf_flowring_create(msgbuf, ifidx, skb);
++-		if (flowid == BRCMF_FLOWRING_INVALID_ID) {
++-			return -ENOMEM;
++-		} else {
+++		if (flowid != BRCMF_FLOWRING_INVALID_ID)
++ 			brcmf_flowring_enqueue(flow, flowid, skb);
++-			return 0;
++-		}
+++		spin_unlock_bh(&flow->lock);
+++		return flowid == BRCMF_FLOWRING_INVALID_ID ? -ENOMEM : 0;
++ 	}
++ 	queue_count = brcmf_flowring_enqueue(flow, flowid, skb);
+++	spin_unlock_bh(&flow->lock);
++ 	force = ((queue_count % BRCMF_MSGBUF_TRICKLE_TXWORKER_THRS) == 0);
++ 	brcmf_msgbuf_schedule_txdata(msgbuf, flowid, force);
++ 
