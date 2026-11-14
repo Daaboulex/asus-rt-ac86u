@@ -1,0 +1,51 @@
+diff --git a/package/kernel/mac80211/Makefile b/package/kernel/mac80211/Makefile
+index 8f267ec..d63c6d9 100644
+--- a/package/kernel/mac80211/Makefile
++++ b/package/kernel/mac80211/Makefile
+@@ -12,7 +12,7 @@ PKG_NAME:=mac80211
+ 
+ PKG_SOURCE_VERSION:=7.2
+ PKG_VERSION:=$(subst -,_,$(PKG_SOURCE_VERSION))
+-PKG_RELEASE:=28
++PKG_RELEASE:=29
+ PKG_LICENSE:=GPL-2.0-only
+ PKG_LICENSE_FILES:=COPYING
+ 
+diff --git a/package/kernel/mac80211/patches/brcm/897-wifi-brcmfmac-set-only-2.4-GHz-VHT-in-vht_features-on-the-BCM4366.patch b/package/kernel/mac80211/patches/brcm/897-wifi-brcmfmac-set-only-2.4-GHz-VHT-in-vht_features-on-the-BCM4366.patch
+new file mode 100644
+index 0000000..1cbe03b
+--- /dev/null
++++ b/package/kernel/mac80211/patches/brcm/897-wifi-brcmfmac-set-only-2.4-GHz-VHT-in-vht_features-on-the-BCM4366.patch
+@@ -0,0 +1,32 @@
++From: Daaboulex <39669593+Daaboulex@users.noreply.github.com>
++Subject: [PATCH] wifi: brcmfmac: set only 2.4 GHz VHT in vht_features on the BCM4366
++
++The 2.4 GHz VHT patch adds bit 0 to the vht_features value the BCM4366
++2.4 GHz radio reports, which turns the 6 of firmware 10.28.2 into 7.
++Firmware 10.10.131.116 still fires the d11 PSM watchdog at 7 on the
++43666 2.4 GHz radio of the RT-AC86U: 25 watchdogs within half an hour
++of one boot, a burst of five at each reconfiguration (bring-up, the
++access points going down or up, a station leaving), and the 2.4 GHz
++clients lose their traffic each time. With 1, bit 0 alone, the same
++image fired one watchdog at boot and none through two restarts of all
++access points.
++
++On 10.28.2 the values 1 and 7 were found equally stable, so set exactly
++1: 2.4 GHz VHT on, and off the proprietary rates and 1024-QAM that only
++Broadcom clients use on 2.4 GHz.
++
++---
++--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.c
+++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.c
++@@ -5258,9 +5258,9 @@
++ 		brcmf_dbg(INFO, "vht_features get failed (%d)\n", err);
++ 		return;
++ 	}
++-	if (val & BRCMF_VHT_FEATURES_2G_ENAB)
+++	want = BRCMF_VHT_FEATURES_2G_ENAB;
+++	if (val == want)
++ 		return;
++-	want = val | BRCMF_VHT_FEATURES_2G_ENAB;
++ 	err = brcmf_fil_iovar_int_set(ifp, "vht_features", want);
++ 	if (err < 0)
++ 		bphy_err(ifp->drvr, "vht_features 2.4 GHz enable failed (%d)\n",
