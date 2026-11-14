@@ -11,6 +11,7 @@ REPO = Path(__file__).resolve().parents[2]
 HOST = os.environ.get("ROUTER", "")
 KNOWN_HOSTS = os.environ.get("ROUTER_KNOWN_HOSTS", str(REPO / ".devshell" / "router_known_hosts"))
 PROXY_COMMAND = os.environ.get("ROUTER_PROXY_COMMAND", "")
+IDENTITY = os.environ.get("ROUTER_IDENTITY", "")
 GUIDED = os.environ.get("ROUTER_GUIDED") == "1"
 DISRUPTIVE = os.environ.get("ROUTER_DISRUPTIVE") == "1"
 DESTRUCTIVE = os.environ.get("ROUTER_DESTRUCTIVE") == "1"
@@ -57,6 +58,7 @@ class Router:
             "-o",
             "LogLevel=ERROR",
             *(("-o", f"ProxyCommand={PROXY_COMMAND}") if PROXY_COMMAND else ()),
+            *(("-o", f"IdentityFile={IDENTITY}", "-o", "IdentitiesOnly=yes") if IDENTITY else ()),
             *options,
             f"root@{self.host}",
             command,

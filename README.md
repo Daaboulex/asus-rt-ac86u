@@ -77,6 +77,9 @@ port promises. `ROUTER` names the router:
 ROUTER=192.168.1.1 nix run .#hardware-test
 ```
 
+The tests log in as root with a key, never a password; `ROUTER_IDENTITY`
+names the key file when it is not one of ssh's defaults.
+
 Three switches open the tests that need more than a look:
 
 | Variable | Opens |
