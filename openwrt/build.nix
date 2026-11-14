@@ -79,7 +79,7 @@ pkgs.buildFHSEnv {
       findutils
       flex
       gawk
-      gcc
+      (lib.hiPrio gcc)
       getopt
       gettext
       git
