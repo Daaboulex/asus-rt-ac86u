@@ -1,0 +1,97 @@
+diff --git a/package/kernel/mac80211/Makefile b/package/kernel/mac80211/Makefile
+index 49064b6..65ed559 100644
+--- a/package/kernel/mac80211/Makefile
++++ b/package/kernel/mac80211/Makefile
+@@ -12,7 +12,7 @@ PKG_NAME:=mac80211
+ 
+ PKG_SOURCE_VERSION:=7.2
+ PKG_VERSION:=$(subst -,_,$(PKG_SOURCE_VERSION))
+-PKG_RELEASE:=24
++PKG_RELEASE:=25
+ PKG_LICENSE:=GPL-2.0-only
+ PKG_LICENSE_FILES:=COPYING
+ 
+diff --git a/package/kernel/mac80211/patches/brcm/894-wifi-brcmfmac-bca-answer-the-association-firmware-holds-after-sae.patch b/package/kernel/mac80211/patches/brcm/894-wifi-brcmfmac-bca-answer-the-association-firmware-holds-after-sae.patch
+new file mode 100644
+index 0000000..7293304
+--- /dev/null
++++ b/package/kernel/mac80211/patches/brcm/894-wifi-brcmfmac-bca-answer-the-association-firmware-holds-after-sae.patch
+@@ -0,0 +1,78 @@
++From: Daaboulex <39669593+Daaboulex@users.noreply.github.com>
++Subject: [PATCH] wifi: brcmfmac: bca: answer the association firmware holds after SAE
++
++Broadcom's BCA firmware for the 4366c0, 10.10.131.116 among it, does
++not answer the Association Request of a station that authenticated
++with SAE in the host. It reports the request as a WLC_E_ASSOC or
++WLC_E_REASSOC event carrying its elements and waits for the host to
++send the Association Response through the WLC_SCB_ASSOCIATE ioctl, as
++Broadcom's own host driver does. brcmfmac has no handler for these
++events, so the request goes unanswered, the client times out, and the
++firmware drops the station several seconds later. 10.10.131.81
++answers such a request itself.
++
++On an access point, answer a request the firmware accepted: send a
++successful (Re)Association Response for the station through
++WLC_SCB_ASSOCIATE. The firmware then completes the association and
++reports it with ASSOC_IND as before, so hostapd still checks the
++station's SAE state and runs the 4-way handshake.
++
++---
++--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/bca/core.c
+++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/bca/core.c
++@@ -126,9 +126,45 @@
++ 	return 0;
++ }
++ 
+++static s32 brcmf_bca_notify_assoc(struct brcmf_if *ifp,
+++				  const struct brcmf_event_msg *e, void *data)
+++{
+++	struct ieee80211_mgmt *mgmt;
+++	size_t len;
+++	u16 stype;
+++	s32 err;
+++
+++	if (!ifp->vif || ifp->vif->wdev.iftype != NL80211_IFTYPE_AP)
+++		return 0;
+++	if (!e->datalen || e->status != BRCMF_E_STATUS_SUCCESS)
+++		return 0;
+++
+++	stype = e->event_code == BRCMF_E_REASSOC ? IEEE80211_STYPE_REASSOC_RESP :
+++						   IEEE80211_STYPE_ASSOC_RESP;
+++	len = offsetof(struct ieee80211_mgmt, u.assoc_resp.variable);
+++	mgmt = kzalloc(len, GFP_KERNEL);
+++	if (!mgmt)
+++		return -ENOMEM;
+++
+++	mgmt->frame_control = cpu_to_le16(IEEE80211_FTYPE_MGMT | stype);
+++	memcpy(mgmt->da, e->addr, ETH_ALEN);
+++	memcpy(mgmt->sa, ifp->mac_addr, ETH_ALEN);
+++	memcpy(mgmt->bssid, ifp->mac_addr, ETH_ALEN);
+++	mgmt->u.assoc_resp.status_code = cpu_to_le16(WLAN_STATUS_SUCCESS);
+++
+++	err = brcmf_fil_cmd_data_set(ifp, BRCMF_C_SCB_ASSOCIATE, mgmt, len);
+++	if (err)
+++		bphy_err(ifp->drvr, "association of %pM refused: %d\n",
+++			 e->addr, err);
+++	kfree(mgmt);
+++	return 0;
+++}
+++
++ static void brcmf_bca_register_event_handlers(struct brcmf_pub *drvr)
++ {
++ 	brcmf_fweh_register(drvr, BRCMF_E_AUTH, brcmf_bca_notify_auth);
+++	brcmf_fweh_register(drvr, BRCMF_E_ASSOC, brcmf_bca_notify_assoc);
+++	brcmf_fweh_register(drvr, BRCMF_E_REASSOC, brcmf_bca_notify_assoc);
++ }
++ 
++ const struct brcmf_fwvid_ops brcmf_bca_ops = {
++--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/fwil.h
+++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/fwil.h
++@@ -81,6 +81,7 @@
++ #define BRCMF_C_SET_VAR				263
++ #define BRCMF_C_SET_WSEC_PMK			268
++ #define BRCMF_C_SCB_AUTHENTICATE		325
+++#define BRCMF_C_SCB_ASSOCIATE			327
++ 
++ s32 brcmf_fil_cmd_data_set(struct brcmf_if *ifp, u32 cmd, void *data, u32 len);
++ s32 brcmf_fil_cmd_data_get(struct brcmf_if *ifp, u32 cmd, void *data, u32 len);
