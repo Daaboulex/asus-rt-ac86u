@@ -1,0 +1,75 @@
+diff --git a/package/network/config/wifi-scripts/Makefile b/package/network/config/wifi-scripts/Makefile
+index e3e1b88..a2c88bf 100644
+--- a/package/network/config/wifi-scripts/Makefile
++++ b/package/network/config/wifi-scripts/Makefile
+@@ -9,7 +9,7 @@ include $(TOPDIR)/rules.mk
+ 
+ PKG_NAME:=wifi-scripts
+ PKG_VERSION:=1.0
+-PKG_RELEASE:=5
++PKG_RELEASE:=6
+ PKG_LICENSE:=GPL-2.0
+ 
+ PKG_MAINTAINER:=Felix Fietkau <nbd@nbd.name>
+diff --git a/package/network/config/wifi-scripts/files-ucode/usr/share/ucode/wifi/ap.uc b/package/network/config/wifi-scripts/files-ucode/usr/share/ucode/wifi/ap.uc
+index 3493845..8c65908 100644
+--- a/package/network/config/wifi-scripts/files-ucode/usr/share/ucode/wifi/ap.uc
++++ b/package/network/config/wifi-scripts/files-ucode/usr/share/ucode/wifi/ap.uc
+@@ -222,7 +222,7 @@ function iface_accounting_server(config) {
+ 	append_list(config, [ 'radius_acct_req_attr' ]);
+ }
+ 
+-function iface_auth_type(config, band, eht) {
++function iface_auth_type(config, band, eht, phy_features) {
+ 	if (config.auth_type in [ 'sae', 'owe', 'eap2', 'eap192', 'dpp' ])
+ 		config.ieee80211w = 2;
+ 
+@@ -272,6 +272,10 @@ function iface_auth_type(config, band, eht) {
+ 		if (config.sae_pwe === 0 && config.mlo && index(config.mlo_bands ?? [], '6g') >= 0 &&
+ 		    config.auth_type in [ 'sae', 'psk-sae' ])
+ 			delete config.sae_pwe;
++		/* a radio that beacons no RSNXE cannot announce H2E, and a client
++		 * that supports it but runs hunting-and-pecking is then refused */
++		if (phy_features?.beacon_rsnxe === false)
++			set_default(config, 'sae_pwe', 0);
+ 		if (band == '6g')
+ 			set_default(config, 'sae_pwe', 1);
+ 		else
+@@ -745,7 +749,7 @@ export function generate(interface, data, config, vlans, stas, phy_features) {
+ 
+ 	iface_rates(data.config);
+ 
+-	iface_auth_type(config, data.config.band, wildcard(data.config.htmode ?? '', 'EHT*'));
++	iface_auth_type(config, data.config.band, wildcard(data.config.htmode ?? '', 'EHT*'), phy_features);
+ 
+ 	iface_accounting_server(config);
+ 
+diff --git a/package/network/config/wifi-scripts/files-ucode/usr/share/ucode/wifi/hostapd.uc b/package/network/config/wifi-scripts/files-ucode/usr/share/ucode/wifi/hostapd.uc
+index 7e3d841..5858307 100644
+--- a/package/network/config/wifi-scripts/files-ucode/usr/share/ucode/wifi/hostapd.uc
++++ b/package/network/config/wifi-scripts/files-ucode/usr/share/ucode/wifi/hostapd.uc
+@@ -504,6 +504,7 @@ function device_capabilities(config) {
+ 	phy_features.radar_background = device_extended_features(phy.extended_features, NL80211_EXT_FEATURE_RADAR_BACKGROUND);
+ 	phy_features.cipher_gcmp256 = iface.phy_cipher_gcmp256(phy);
+ 	phy_features.ap_akm_suites = iface.phy_ap_akm_suites(phy);
++	phy_features.beacon_rsnxe = iface.phy_beacons_rsnxe(config.phy);
+ }
+ 
+ function generate(config) {
+diff --git a/package/network/config/wifi-scripts/files-ucode/usr/share/ucode/wifi/iface.uc b/package/network/config/wifi-scripts/files-ucode/usr/share/ucode/wifi/iface.uc
+index 71b5287..fd777ad 100644
+--- a/package/network/config/wifi-scripts/files-ucode/usr/share/ucode/wifi/iface.uc
++++ b/package/network/config/wifi-scripts/files-ucode/usr/share/ucode/wifi/iface.uc
+@@ -24,6 +24,12 @@ export function phy_cipher_gcmp256(phy) {
+ 	return WLAN_CIPHER_SUITE_GCMP_256 in (phy?.cipher_suites ?? []);
+ };
+ 
++export function phy_beacons_rsnxe(name) {
++	const driver = fs.readlink(`/sys/class/ieee80211/${name}/device/driver`);
++
++	return !match(driver ?? '', /\/brcmfmac$/);
++};
++
+ export function phy_ap_akm_suites(phy) {
+ 	let suites = null;
+ 

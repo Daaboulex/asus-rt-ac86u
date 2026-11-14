@@ -201,6 +201,26 @@ def test_wifi_restart_keeps_one_bsscfg_per_access_point(router):
     assert_one_bsscfg_per_access_point(router)
 
 
+def test_sae_access_points_use_the_pwe_their_beacon_announces(router):
+    radios = radio_access_points(router)
+    checked = []
+    for aps in radios.values():
+        try:
+            firmware_variable(router, aps[0], "rsnxe")
+            beacons_rsnxe = True
+        except AssertionError:
+            beacons_rsnxe = False
+        for interface in aps:
+            bss = hostapd_bss(router, interface)
+            if "SAE" not in bss.get("wpa_key_mgmt", "").split():
+                continue
+            if not beacons_rsnxe:
+                assert bss.get("sae_pwe") == "0", f"{interface}: sae_pwe {bss.get('sae_pwe')}"
+            checked.append(interface)
+    if not checked:
+        pytest.skip("no access point offers SAE")
+
+
 def test_radios_take_msi_interrupts(router):
     lines = [
         line
