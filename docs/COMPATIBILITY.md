@@ -107,6 +107,15 @@ the line says so.
   locale's legacy limits. Which power table 10.10.131 uses for legacy
   OFDM on 5 GHz is open. 10.28.2 and
   10.10.131.81 offer the identical channel and power table, 42 entries.
+- On firmware 10.10.131.116 the 2.4 GHz radio's d11 PSM watchdog fires at
+  `vht_features` 7, the value the 2.4 GHz VHT patch 880 leaves. On
+  2026-11-14 one boot logged 25 watchdogs in half an hour, counted from
+  `dmesg`: a burst at bring-up, five within 30 ms at a `wifi down` or
+  `wifi up`, and one after a station left, and the 2.4 GHz clients lost
+  their traffic each time. The router's log stream from 2026-11-10 to 13,
+  on 10.28.2 with patch 880, holds none. Patch 897 sets 1, bit 0 alone; the
+  same image then logged one watchdog at boot and none through two
+  `wifi down` and `wifi up` cycles, each followed for 150 s.
 - Protected management frames (802.11w) work, optional, on every network.
   The firmware builds the RSN element of beacons and probe responses
   itself from what brcmfmac passes, hostapd sends its own in message 3 of
