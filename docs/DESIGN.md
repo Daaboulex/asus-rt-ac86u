@@ -124,7 +124,12 @@ in the package build; the tests in `tests/hardware` run against a router.
   out garbled in flash. Patch 0023 sleeps 20 ms after that reset on the
   BCM4908: with it, 90 warm resets of the same kinds left no crash record,
   while each of the 30 deliberate panics among them left its own
-  (2026-11-13). Cold boots have not been counted with it.
+  (2026-11-13). Cold boots have not been counted with it. Without 0021
+  but with 0023, 90 warm resets of the same kinds, rotated through idle,
+  CPU, network and Wi-Fi load, left no crash record either (2026-11-13 and
+  14), so 0023 is what stops the crash; without 0021 the switch is probed
+  and reset three times per boot instead of once, which
+  `test_switch_is_reset_once_per_boot` refuses, so 0021 stays.
 - A plain `reboot` took about 50 s from the command to the next kernel,
   against about 6 s for a watchdog reset (2026-11-13). At shutdown procd
   points its stdio at `/dev/ttyS0` instead of `/dev/console` and kills
