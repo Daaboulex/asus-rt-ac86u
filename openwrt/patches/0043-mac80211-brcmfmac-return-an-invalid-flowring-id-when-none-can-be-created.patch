@@ -1,13 +1,13 @@
 diff --git a/package/kernel/mac80211/Makefile b/package/kernel/mac80211/Makefile
-index 3866d3f..8f267ec 100644
+index 8f267ec..d63c6d9 100644
 --- a/package/kernel/mac80211/Makefile
 +++ b/package/kernel/mac80211/Makefile
 @@ -12,7 +12,7 @@ PKG_NAME:=mac80211
  
  PKG_SOURCE_VERSION:=7.2
  PKG_VERSION:=$(subst -,_,$(PKG_SOURCE_VERSION))
--PKG_RELEASE:=27
-+PKG_RELEASE:=28
+-PKG_RELEASE:=28
++PKG_RELEASE:=29
  PKG_LICENSE:=GPL-2.0-only
  PKG_LICENSE_FILES:=COPYING
  
