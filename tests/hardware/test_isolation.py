@@ -59,8 +59,11 @@ def test_an_isolated_client_only_answers(router, clients):
 
     assert reaches(router, PEER[0], f"{PING} {client}"), "the isolated client stopped answering"
     assert not reaches(router, CLIENT[0], f"{PING} {peer}"), "the isolated client reached a peer"
+    router.ssh(f"ip neigh del {client} dev {BRIDGE}; ip -n {CLIENT[0]} neigh flush dev eth0")
     assert not reaches(router, CLIENT[0], f"{PING} {gateway}"), (
         "the isolated client reached the router"
     )
+    learned = router.run(f"ip neigh show {client} dev {BRIDGE}")
+    assert CLIENT[2] in learned, "the isolated client's frames that carry no IP stopped passing"
     resolved = reaches(router, CLIENT[0], f"nslookup openwrt.org {gateway}")
     assert not resolved, "the isolated client resolved a name"

@@ -273,7 +273,11 @@ only through the issue its report job opens.
   two devices on one network never reaches the routing firewall; frames
   between two stations of one access point pass the bridge too (measured
   2026-11-17: 20 pings between two stations of the 5 GHz access point,
-  23 frames out and 22 back through the bridge's forward hook). Wi-Fi
+  23 frames out and 22 back through the bridge's forward hook). The table
+  filters only frames that can carry IP (IPv4, IPv6, VLAN-tagged) and lets
+  every other frame pass, so ARP and the Wi-Fi key handshake (EAPOL) keep
+  working: a list of the frames to let through misses one, and a station
+  whose key handshake is dropped falls off Wi-Fi at its next rekey. Wi-Fi
   client isolation was left out: it isolates every client of a network,
   not a chosen one. `kmod-veth` is in the image so the hardware test can
   put two clients on the bridge.

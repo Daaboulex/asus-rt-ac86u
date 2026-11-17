@@ -80,7 +80,8 @@ ssh root@192.168.1.1 'uci add_list firewall.isolated.entry=<mac> && uci commit f
 
 The device keeps its address and answers what another device starts, over
 IPv4, and reaches nothing else: not the internet, not DNS, not the router,
-not another device. A connection it opened before is cut. Set the device up
+not another device. Frames that carry no IP, such as ARP and the Wi-Fi key
+handshake, still pass. A connection it opened before is cut. Set the device up
 in its own app first, while it can still reach its vendor's servers.
 
 ## Testing on the router

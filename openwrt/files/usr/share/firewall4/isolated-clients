@@ -12,7 +12,7 @@ table bridge isolated {
 	chain input {
 		type filter hook input priority filter; policy accept;
 		ether saddr != @clients accept
-		ether type arp accept
+		ether type != { ip, ip6, vlan, 8021ad } accept
 		udp dport 67 accept
 		ct direction reply accept
 		drop
@@ -20,7 +20,7 @@ table bridge isolated {
 	chain forward {
 		type filter hook forward priority filter; policy accept;
 		ether saddr != @clients accept
-		ether type arp accept
+		ether type != { ip, ip6, vlan, 8021ad } accept
 		ct direction reply accept
 		drop
 	}
