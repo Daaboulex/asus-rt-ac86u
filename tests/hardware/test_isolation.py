@@ -3,7 +3,7 @@ import pytest
 BRIDGE = "br-lan"
 CLIENT = ("hwtest-client", "hwtest-c", "02:00:00:00:15:01")
 PEER = ("hwtest-peer", "hwtest-p", "02:00:00:00:15:02")
-LEASE_SCRIPT = "/tmp/hardware-test-lease"
+LEASE = "/tmp/hardware-test-lease"
 PING = "ping -c 2 -W 2"
 
 
@@ -12,8 +12,16 @@ def reaches(router, namespace: str, command: str) -> bool:
 
 
 def lease(router, namespace: str) -> str:
-    address = router.run(f"ip netns exec {namespace} udhcpc -i eth0 -n -q -t 5 -s {LEASE_SCRIPT}")
-    address = address.strip().splitlines()[-1]
+    script = f"{LEASE}-{namespace}"
+    router.run(
+        f'printf \'#!/bin/sh\\n[ "$1" = bound ] && echo "$ip/$mask" > {script}.address\\n\''
+        f" > {script} && chmod +x {script}"
+    )
+    router.run(
+        f"ip netns exec {namespace} udhcpc -i eth0 -n -R -t 5 -s {script} -p {script}.pid"
+        " > /dev/null 2>&1"
+    )
+    address = router.run(f"cat {script}.address").strip()
     router.run(f"ip -n {namespace} addr add {address} dev eth0")
     return address.split("/")[0]
 
@@ -22,8 +30,6 @@ def lease(router, namespace: str) -> str:
 def clients(router):
     pending = router.run("uci changes firewall").strip()
     assert not pending, f"the firewall has uncommitted changes:\n{pending}"
-    router.run(f'printf \'#!/bin/sh\\n[ "$1" = bound ] && echo "$ip/$mask"\\n\' > {LEASE_SCRIPT}')
-    router.run(f"chmod +x {LEASE_SCRIPT}")
     for namespace, port, mac in (CLIENT, PEER):
         router.run(
             f"ip netns add {namespace} && "
@@ -34,7 +40,8 @@ def clients(router):
         )
     yield {namespace: lease(router, namespace) for namespace, _, _ in (CLIENT, PEER)}
     router.ssh(
-        f"ip netns del {CLIENT[0]}; ip netns del {PEER[0]}; rm -f {LEASE_SCRIPT}; "
+        f"kill $(cat {LEASE}-{CLIENT[0]}.pid {LEASE}-{PEER[0]}.pid); sleep 2; "
+        f"ip netns del {CLIENT[0]}; ip netns del {PEER[0]}; rm -f {LEASE}-*; "
         f"uci -q del_list firewall.isolated.entry={CLIENT[2]}; uci commit firewall; fw4 -q reload"
     )
 
