@@ -265,3 +265,15 @@ only through the issue its report job opens.
   toolchain, and building LLVM inside OpenWrt costs hours. `qosify` and
   `sqm-scripts` each attach cake to the WAN, so switching `qosify` on
   means switching `sqm` off.
+- The image isolates chosen clients (2026-11-17): a device whose MAC address
+  is in the firewall IP set `isolated` may get an address and answer what
+  another device starts, and nothing else, so a device that phones home is
+  kept local without a Wi-Fi network of its own. The filter sits in a
+  bridge table, which `kmod-nft-bridge` brings, because traffic between
+  two devices on one network never reaches the routing firewall; frames
+  between two stations of one access point pass the bridge too (measured
+  2026-11-17: 20 pings between two stations of the 5 GHz access point,
+  23 frames out and 22 back through the bridge's forward hook). Wi-Fi
+  client isolation was left out: it isolates every client of a network,
+  not a chosen one. `kmod-veth` is in the image so the hardware test can
+  put two clients on the bridge.

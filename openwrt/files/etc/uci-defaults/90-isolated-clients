@@ -1,0 +1,12 @@
+uci -q get firewall.isolated >/dev/null || uci batch <<EOF
+set firewall.isolated=ipset
+set firewall.isolated.name='isolated'
+set firewall.isolated.match='src_mac'
+EOF
+uci -q get firewall.isolated_clients >/dev/null || uci batch <<EOF
+set firewall.isolated_clients=include
+set firewall.isolated_clients.type='script'
+set firewall.isolated_clients.path='/usr/share/firewall4/isolated-clients'
+set firewall.isolated_clients.fw4_compatible='1'
+EOF
+uci commit firewall

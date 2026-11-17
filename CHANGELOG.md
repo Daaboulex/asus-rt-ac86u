@@ -29,3 +29,7 @@ also sold as the RT-AC2900, and `asus-rescue`, the Linux tool that flashes it.
 - `iw-full` replaces `iw`, so the radio firmware's power targets can be
   read, and a hardware test checks that a configured transmit power caps
   every chain.
+- A device whose MAC address is in the firewall IP set `isolated` gets an
+  address and answers what other devices start, and reaches nothing: no
+  internet, no DNS, no router, no other device. A hardware test checks it
+  with two clients on the bridge.

@@ -1,0 +1,28 @@
+clients=$(uci -q get firewall.isolated.entry | sed 's/ /, /g')
+elements=
+[ -n "$clients" ] && elements="elements = { $clients }"
+nft -f - <<EOF
+table bridge isolated
+delete table bridge isolated
+table bridge isolated {
+	set clients {
+		type ether_addr
+		$elements
+	}
+	chain input {
+		type filter hook input priority filter; policy accept;
+		ether saddr != @clients accept
+		ether type arp accept
+		udp dport 67 accept
+		ct direction reply accept
+		drop
+	}
+	chain forward {
+		type filter hook forward priority filter; policy accept;
+		ether saddr != @clients accept
+		ether type arp accept
+		ct direction reply accept
+		drop
+	}
+}
+EOF

@@ -69,6 +69,20 @@ ssh root@192.168.1.1 'cat > /tmp/firmware.bin' < <image>.bin
 ssh root@192.168.1.1 sysupgrade /tmp/firmware.bin
 ```
 
+## Keeping a device local
+
+Add a device's MAC address to the IP set `isolated` in LuCI, under
+Network, Firewall, IP Sets, or from a shell:
+
+```bash
+ssh root@192.168.1.1 'uci add_list firewall.isolated.entry=<mac> && uci commit firewall && fw4 reload'
+```
+
+The device keeps its address and answers what another device starts, over
+IPv4, and reaches nothing else: not the internet, not DNS, not the router,
+not another device. A connection it opened before is cut. Set the device up
+in its own app first, while it can still reach its vendor's servers.
+
 ## Testing on the router
 
 `hardware-test` checks a running router over SSH, one test per behaviour the
