@@ -37,7 +37,8 @@ also sold as the RT-AC2900, and `asus-rescue`, the Linux tool that flashes it.
 ### Changed
 
 - The series no longer raises the `PKG_RELEASE` of OpenWrt's packages, so an
-  upstream bump no longer breaks the patches after it.
+  upstream bump no longer breaks the patches after it. The image follows
+  OpenWrt main past the removal of `brcmsmac`.
 
 ### Fixed
 
