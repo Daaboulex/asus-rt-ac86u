@@ -33,3 +33,10 @@ also sold as the RT-AC2900, and `asus-rescue`, the Linux tool that flashes it.
   address and answers what other devices start, and reaches nothing: no
   internet, no DNS, no router, no other device. A hardware test checks it
   with two clients on the bridge.
+
+### Fixed
+
+- `openwrt-build` copies every file of the pinned trees that changed, also
+  one whose size stayed the same. Every file in the Nix store carries the
+  same time, so a rebuild after the pins moved kept such a file stale and
+  could mix the old and the new tree.

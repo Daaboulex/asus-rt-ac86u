@@ -4,6 +4,7 @@
   feeds,
   cferam,
   applySeries,
+  copyTree,
 }:
 let
   feedArgs = pkgs.lib.concatMapStringsSep " " (name: "${name} \"$work/feed-src/${name}\"") (
@@ -11,7 +12,7 @@ let
   );
   feedCopies = pkgs.lib.concatStrings (
     pkgs.lib.mapAttrsToList (name: src: ''
-      rsync -a --no-owner --no-group --delete --chmod=u+w "${src}/" "$work/feed-src/${name}/"
+      ${pkgs.lib.getExe copyTree} "${src}/" "$work/feed-src/${name}/"
     '') feeds
   );
   ltoPlugin = "${pkgs.gcc.cc}/libexec/gcc/${pkgs.stdenv.hostPlatform.config}/${pkgs.gcc.cc.version}/liblto_plugin.so";
@@ -39,14 +40,14 @@ let
       shift
       work="$root/.devshell/openwrt"
       mkdir -p "$work/feed-src"
-      rsync -a --no-owner --no-group --delete --chmod=u+w \
+      ${pkgs.lib.getExe copyTree} \
         --exclude=/build_dir/ --exclude=/staging_dir/ --exclude=/dl/ --exclude=/tmp/ \
         --exclude=/bin/ --exclude=/logs/ --exclude=/feeds/ --exclude=/package/feeds/ \
         --exclude=/feed-src/ --exclude=/.config --exclude=/.config.old --exclude=/feeds.conf \
         --exclude='/key-build*' --exclude=/private-key.pem --exclude=/public-key.pem \
         "${openwrt}/" "$work/"
       ${feedCopies}
-      rsync -a --no-owner --no-group --delete --chmod=u+w "$root/openwrt/files/" "$work/files/"
+      ${pkgs.lib.getExe copyTree} "$root/openwrt/files/" "$work/files/"
       cd "$work"
       printf '%s\n' "${openwrt.shortRev}" > version
       printf '%s\n' "${toString openwrt.lastModified}" > version.date

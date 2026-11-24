@@ -46,6 +46,7 @@
         }:
         let
           applySeries = import ./openwrt/apply-series.nix { inherit pkgs; };
+          copyTree = import ./openwrt/copy-tree.nix { inherit pkgs; };
           seriesApplied =
             name: tree: series:
             pkgs.runCommand name { } ''
@@ -78,7 +79,7 @@
           packages.default = pkgs.python312.pkgs.callPackage ./package.nix { };
 
           packages.openwrt-build = import ./openwrt/build.nix {
-            inherit pkgs applySeries;
+            inherit pkgs applySeries copyTree;
             inherit (inputs) openwrt;
             cferam = import ./openwrt/cferam.nix { inherit pkgs; };
             feeds = {
@@ -108,6 +109,20 @@
             drv = config.packages.default;
             package = "asus_rescue";
           };
+
+          checks.openwrt-copy-tree-takes-same-size-changes = pkgs.runCommand "openwrt-copy-tree" { } ''
+            mkdir old new work
+            printf 'LINUX_VERSION-6.18 = .60\n' > old/kernel
+            printf 'LINUX_VERSION-6.18 = .64\n' > new/kernel
+            touch -d @1 old/kernel new/kernel
+            ${lib.getExe copyTree} old/ work/
+            ${lib.getExe copyTree} new/ work/
+            if ! grep -qx 'LINUX_VERSION-6.18 = .64' work/kernel; then
+              echo "a file that changed without changing its size or time was not copied"
+              exit 1
+            fi
+            touch "$out"
+          '';
 
           checks.openwrt-series-applies =
             seriesApplied "openwrt-series-applies" inputs.openwrt
