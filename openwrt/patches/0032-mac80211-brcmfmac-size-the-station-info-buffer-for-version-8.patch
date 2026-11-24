@@ -1,16 +1,3 @@
-diff --git a/package/kernel/mac80211/Makefile b/package/kernel/mac80211/Makefile
-index 4141d37..a14061a 100644
---- a/package/kernel/mac80211/Makefile
-+++ b/package/kernel/mac80211/Makefile
-@@ -12,7 +12,7 @@ PKG_NAME:=mac80211
- 
- PKG_SOURCE_VERSION:=7.2
- PKG_VERSION:=$(subst -,_,$(PKG_SOURCE_VERSION))
--PKG_RELEASE:=19
-+PKG_RELEASE:=20
- PKG_LICENSE:=GPL-2.0-only
- PKG_LICENSE_FILES:=COPYING
- 
 diff --git a/package/kernel/mac80211/patches/brcm/888-wifi-brcmfmac-size-the-station-info-buffer-for-version-8.patch b/package/kernel/mac80211/patches/brcm/888-wifi-brcmfmac-size-the-station-info-buffer-for-version-8.patch
 new file mode 100644
 index 0000000..8a04516

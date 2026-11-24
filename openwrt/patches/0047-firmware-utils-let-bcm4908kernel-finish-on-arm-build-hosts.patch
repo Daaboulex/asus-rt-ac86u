@@ -1,16 +1,3 @@
-diff --git a/tools/firmware-utils/Makefile b/tools/firmware-utils/Makefile
-index da84e6f..3009719 100644
---- a/tools/firmware-utils/Makefile
-+++ b/tools/firmware-utils/Makefile
-@@ -7,7 +7,7 @@
- include $(TOPDIR)/rules.mk
- 
- PKG_NAME:=firmware-utils
--PKG_RELEASE:=1
-+PKG_RELEASE:=2
- 
- PKG_SOURCE_PROTO:=git
- PKG_SOURCE_URL=$(PROJECT_GIT)/project/firmware-utils.git
 diff --git a/tools/firmware-utils/patches/001-bcm4908kernel-hold-the-getopt-result-in-an-int.patch b/tools/firmware-utils/patches/001-bcm4908kernel-hold-the-getopt-result-in-an-int.patch
 new file mode 100644
 index 0000000..95656fe

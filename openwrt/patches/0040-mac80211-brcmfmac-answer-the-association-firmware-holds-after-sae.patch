@@ -1,16 +1,3 @@
-diff --git a/package/kernel/mac80211/Makefile b/package/kernel/mac80211/Makefile
-index 65ed559..ba14dee 100644
---- a/package/kernel/mac80211/Makefile
-+++ b/package/kernel/mac80211/Makefile
-@@ -12,7 +12,7 @@ PKG_NAME:=mac80211
- 
- PKG_SOURCE_VERSION:=7.2
- PKG_VERSION:=$(subst -,_,$(PKG_SOURCE_VERSION))
--PKG_RELEASE:=25
-+PKG_RELEASE:=26
- PKG_LICENSE:=GPL-2.0-only
- PKG_LICENSE_FILES:=COPYING
- 
 diff --git a/package/kernel/mac80211/patches/brcm/894-wifi-brcmfmac-bca-answer-the-association-firmware-holds-after-sae.patch b/package/kernel/mac80211/patches/brcm/894-wifi-brcmfmac-bca-answer-the-association-firmware-holds-after-sae.patch
 new file mode 100644
 index 0000000..7293304

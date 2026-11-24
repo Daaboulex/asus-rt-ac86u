@@ -2,7 +2,7 @@ diff --git a/package/firmware/brcmfmac-firmware-4366c0-pcie-rt-ac86u/Makefile b/
 index b36effa..398346f 100644
 --- a/package/firmware/brcmfmac-firmware-4366c0-pcie-rt-ac86u/Makefile
 +++ b/package/firmware/brcmfmac-firmware-4366c0-pcie-rt-ac86u/Makefile
-@@ -4,7 +4,7 @@
+@@ -4,7 +4,7 @@ include $(TOPDIR)/rules.mk
  
  PKG_NAME:=brcmfmac-firmware-4366c0-pcie-rt-ac86u
  PKG_VERSION:=10.10.131.116
@@ -11,7 +11,7 @@ index b36effa..398346f 100644
  
  include $(INCLUDE_DIR)/package.mk
  
-@@ -12,6 +12,10 @@
+@@ -12,6 +12,10 @@ GPL_REPO:=threader/DX5401-B0-V517ABYO6C0_GPL
  GPL_COMMIT:=5df85c8c423ee935eed37b81f0d76dc569e2deb0
  GPL_DONGLE:=package/base-files-prebuild/files/rootfs/etc/wlan/dhd/4366c0
  
@@ -22,7 +22,7 @@ index b36effa..398346f 100644
  define Download/rtecdc
    URL:=https://raw.githubusercontent.com/$(GPL_REPO)/$(GPL_COMMIT)/$(GPL_DONGLE)
    URL_FILE:=rtecdc.bin
-@@ -31,18 +35,22 @@
+@@ -31,18 +35,22 @@ define Package/brcmfmac-firmware-4366c0-pcie-rt-ac86u/description
    Broadcom's BCA dongle firmware for the BCM4366c0, build 10.10.131.116,
    the newest published access point build, from a mirror of Zyxel's
    DX5401-B0 GPL release. It hands SAE authentication to hostapd, so the

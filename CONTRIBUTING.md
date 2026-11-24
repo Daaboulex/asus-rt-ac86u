@@ -64,8 +64,9 @@ repo with the next release.
 
 ## This project
 
-- A patch to an OpenWrt package bumps that package's `PKG_RELEASE` in the same outer patch, so a
-  package manager sees the change.
+- A patch to an OpenWrt package leaves that package's `PKG_RELEASE` as OpenWrt has it: OpenWrt
+  rebuilds a package when its patches change, and upstream raises the number often enough that a
+  bump in the series breaks every patch after it. A package the series adds keeps its own number.
 - Kernel patches take OpenWrt's numbering bands: 3xx for device trees and bindings, 7xx for network
   drivers, 8xx for other drivers.
 - The `Test:` line of a change to the image names the hardware suite's result on the unit.

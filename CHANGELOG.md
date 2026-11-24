@@ -34,6 +34,11 @@ also sold as the RT-AC2900, and `asus-rescue`, the Linux tool that flashes it.
   internet, no DNS, no router, no other device. A hardware test checks it
   with two clients on the bridge.
 
+### Changed
+
+- The series no longer raises the `PKG_RELEASE` of OpenWrt's packages, so an
+  upstream bump no longer breaks the patches after it.
+
 ### Fixed
 
 - `openwrt-build` copies every file of the pinned trees that changed, also
