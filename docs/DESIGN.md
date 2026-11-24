@@ -71,6 +71,19 @@ in the package build; the tests in `tests/hardware` run against a router.
   interface and device disabled, held by `test_qosify_ships_shaping_nothing`.
 - A transmit power set for a radio caps every chain in its firmware:
   `test_configured_transmit_power_caps_every_chain`.
+- A router updates itself only to an image whose checksum carries a
+  signature from a key it trusts:
+  `test_an_update_needs_a_trusted_signature_and_its_checksum`, and the image
+  trusts the release key under the name `usign` looks it up by:
+  `test_the_image_trusts_the_release_key_under_its_usign_id`. It takes the
+  newest release old enough and never an older one than it runs:
+  `test_the_router_picks_the_newest_release_old_enough_and_newer_than_its_own`.
+  An update that loses what worked before is flashed back and never taken
+  again: `test_the_check_watches_what_works_now`,
+  `test_the_owners_checks_join_the_watch_and_report_what_fails` and
+  `test_an_update_flashes_a_signed_release_and_goes_back_when_it_loses_a_check`.
+  Each image names the commit it was built from in `/etc/port_release`:
+  `test_the_image_names_the_commit_it_was_built_from`.
 
 ## Hardware facts (this unit, stock boot log and dumps, 2026-11-10)
 
@@ -281,3 +294,27 @@ only through the issue its report job opens.
   client isolation was left out: it isolates every client of a network,
   not a chosen one. `kmod-veth` is in the image so the hardware test can
   put two clients on the bridge.
+- A router updates itself from this repository's releases (2026-11-24)
+  until the board is in OpenWrt, where `owut` and the attended sysupgrade
+  server can serve it; that server builds only for boards OpenWrt supports.
+  `port-update` uses only OpenWrt's own parts: the sysupgrade image, `usign`
+  for the signature, `sysupgrade` to flash. The workflow signs every build of
+  `main` with a key kept as a repository secret, as OpenWrt's build servers
+  sign its releases, so GitHub and the router are all an update needs. A
+  maintainer signing each release after the hardware suite was left out: it
+  needs a second machine on every release. What the suite would catch, the
+  router checks on itself: before flashing it notes what works and after the
+  update it waits for all of it, because a fixed list of checks would miss
+  what one setup has and another lacks. The owner adds checks of their own as
+  executable files on the router, held to the same before and after rule, so
+  a VPN that was already down that night does not undo an update. The two flash slots give no way
+  back: a UBI sysupgrade always writes `firmware` and leaves `backup` alone,
+  and the CFE ROM offers the other image only on its serial console (its
+  menu: "i - followed by 0 to boot to a previous fs image"; no source found
+  for an automatic fallback, 2026-11-24). So the router keeps the image it
+  ran on its overlay through the sysupgrade keep list, fetching the release
+  it runs before its first update, and refuses an update without one; an
+  image that does not boot at all needs rescue mode. It takes the newest
+  release a few days old rather than the latest, which a daily build keeps
+  younger than any delay. It ships off, every setting lives on the router,
+  and it leaves once `owut` serves this board.

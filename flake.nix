@@ -70,6 +70,7 @@
           pre-commit.settings.hooks.typos.settings.config.default.extend-identifiers.sme_state = "sme_state";
           pre-commit.settings.hooks.typos.settings.config.default.extend-identifiers.nd_enabled =
             "nd_enabled";
+          pre-commit.settings.hooks.typos.settings.config.default.extend-words.usign = "usign";
           pre-commit.settings.hooks.typos.settings.config.default.extend-ignore-re = [
             "(?m)^[-+ ]?index [0-9a-f]+\\.\\.[0-9a-f]+( [0-7]+)?$"
             "(?m)^[-+ ]?@@ -[0-9,]+ \\+[0-9,]+ @@.*$"
@@ -95,6 +96,7 @@
               pkgs.openssh
               pkgs.jq
               pkgs.git
+              pkgs.signify
             ];
             text = ''
               root=$(git rev-parse --show-toplevel)

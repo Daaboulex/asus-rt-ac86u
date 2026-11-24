@@ -69,6 +69,41 @@ ssh root@192.168.1.1 'cat > /tmp/firmware.bin' < <image>.bin
 ssh root@192.168.1.1 sysupgrade /tmp/firmware.bin
 ```
 
+### Automatic updates
+
+The image carries `port-update`, which follows this repository's releases and
+stays off until switched on. Every build of `main` is signed by the workflow
+with the release key, whose public half is `openwrt/release-key.pub` and ships
+in the image, so a router trusts the releases from its first boot. A router
+takes the newest release that is a few days old and newer than its own, in a
+night window while the WAN is quiet. Before its first update it fetches the
+release it runs, so it always holds a way back. Before flashing it notes what
+works: the network interfaces that are up, the Wi-Fi networks, the WireGuard
+tunnels with a recent handshake, the services procd keeps alive, DNS and a
+kernel free of crashes. After the update it waits for all of them, and flashes
+the previous image again when one stays missing. A release that failed is never
+taken again.
+An image that does not boot at all cannot go back by itself: the bootloader
+offers the previous image only on its serial console, so that case needs
+rescue mode.
+
+```bash
+ssh root@192.168.1.1 'uci set port_update.main.enabled=1 && uci commit port_update && port-update check'
+```
+
+The settings live in `/etc/config/port_update` on the router; the options and
+their defaults are read at the top of `/usr/sbin/port-update`. Checks of your
+own, for a VPN, a blocklist or a firewall rule, go into `/etc/port-update/checks/`
+on the router: every executable file there is one check, passing when it exits
+0 within a minute. They follow the same rule as the rest: a check that passed
+before an update must pass after it. `port-update check` lists the ones failing
+now, and `chmod -x` switches one off. The folder survives every update.
+
+A fork signs with its own key: make a key pair with
+`signify -G -n -p openwrt/release-key.pub -s release.sec`, store the secret
+key as the repository secret `RELEASE_SIGNING_KEY`, and keep a copy of it
+off GitHub, since a router trusts only the keys its image carries.
+
 ## Keeping a device local
 
 Add a device's MAC address to the IP set `isolated` in LuCI, under
@@ -102,7 +137,7 @@ Three switches open the tests that need more than a look:
 |---|---|
 | `ROUTER_DISRUPTIVE=1` | brief outages: WAN down and up, a band off and on, a radar channel, a firewall change left to roll back |
 | `ROUTER_GUIDED=1` | steps that need hands or eyes: buttons, cables, LEDs, USB ports, failsafe |
-| `ROUTER_DESTRUCTIVE=1` | a deliberate panic, repeated reboots, a factory reset restored from a fresh backup, and a sysupgrade to `ROUTER_IMAGE` |
+| `ROUTER_DESTRUCTIVE=1` | a deliberate panic, repeated reboots, a factory reset restored from a fresh backup, a sysupgrade to `ROUTER_IMAGE`, and two automatic updates to it, the second losing a check and going back |
 
 ## Known limits
 

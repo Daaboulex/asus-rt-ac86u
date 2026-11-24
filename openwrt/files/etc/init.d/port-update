@@ -1,0 +1,11 @@
+#!/bin/sh /etc/rc.common
+
+START=99
+
+boot() {
+	(/usr/sbin/port-update boot) </dev/null >/dev/null 2>&1 &
+}
+
+start() {
+	return 0
+}

@@ -48,6 +48,16 @@ let
         "${openwrt}/" "$work/"
       ${feedCopies}
       ${pkgs.lib.getExe copyTree} "$root/openwrt/files/" "$work/files/"
+      release=$(git -C "$root" rev-parse HEAD)
+      if [ -n "$(git -C "$root" status --porcelain)" ]; then
+        release="$release-dirty"
+      fi
+      mkdir -p "$work/files/etc"
+      printf '%s\n' "$release" > "$work/files/etc/port_release"
+      key="$root/openwrt/release-key.pub"
+      key_id=$(sed -n 2p "$key" | base64 -d | od -An -tx1 -j2 -N8 | tr -d ' \n')
+      mkdir -p "$work/files/etc/port-update/keys"
+      cp "$key" "$work/files/etc/port-update/keys/$key_id"
       cd "$work"
       printf '%s\n' "${openwrt.shortRev}" > version
       printf '%s\n' "${toString openwrt.lastModified}" > version.date

@@ -56,8 +56,13 @@ jobs:
     if: needs.moved.outputs.build == 'yes'
     runs-on: ubuntu-latest
     timeout-minutes: 350
+    outputs:
+      commit: ${{ steps.commit.outputs.sha }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Name the commit the image is built from
+        id: commit
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - uses: DeterminateSystems/determinate-nix-action@16f94ba7aae399b9f9077c254b6719ec6de7e3e3
         with:
           extra-conf: lazy-trees = false
@@ -109,6 +114,52 @@ jobs:
         with:
           name: log-firmware
           path: ${{ runner.temp }}/log-firmware.log
+
+  release:
+    needs: build
+    if: needs.build.result == 'success' && github.ref == 'refs/heads/main'
+    environment: release
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      COMMIT: ${{ needs.build.outputs.commit }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ needs.build.outputs.commit }}
+      - uses: DeterminateSystems/determinate-nix-action@16f94ba7aae399b9f9077c254b6719ec6de7e3e3
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          name: rt-ac86u-firmware
+          path: firmware
+
+      - name: Sign the image and publish it as a release
+        env:
+          SIGNING_KEY: ${{ secrets.RELEASE_SIGNING_KEY }}
+        run: |
+          tag="build-${COMMIT:0:12}"
+          if gh release view "$tag" --repo "$REPO" >/dev/null 2>&1; then
+            echo "$tag is already published"
+            exit 0
+          fi
+          if [ -z "$SIGNING_KEY" ]; then
+            echo "::error::the secret RELEASE_SIGNING_KEY is not set, so no router could trust a release"
+            exit 1
+          fi
+          key="$RUNNER_TEMP/release.sec"
+          trap 'rm -f "$key"' EXIT
+          printf '%s\n' "$SIGNING_KEY" > "$key"
+          nix shell --inputs-from . nixpkgs#signify -c \
+            signify -S -s "$key" -m firmware/SHA256SUMS -x firmware/SHA256SUMS.sig
+          nix shell --inputs-from . nixpkgs#signify -c \
+            signify -V -p openwrt/release-key.pub -m firmware/SHA256SUMS -x firmware/SHA256SUMS.sig
+          gh release create "$tag" firmware/* --repo "$REPO" --target "$COMMIT" \
+            --title "$tag" --notes "Image of $COMMIT, signed with the key in openwrt/release-key.pub."
 
   report:
     needs: build

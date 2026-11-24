@@ -1,0 +1,266 @@
+#!/bin/sh
+. /lib/functions.sh
+
+config_load port_update
+config_get_bool ENABLED main enabled 0
+config_get URL main url
+config_get KEYS main keys /etc/port-update/keys
+config_get MIN_AGE main min_age_days 3
+config_get START main start 0300
+config_get END main end 0500
+config_get IDLE_DEVICE main idle_device wan
+config_get IDLE_PPS main idle_pps 20
+config_get IDLE_WINDOW main idle_window 120
+config_get SETTLE main settle 300
+config_get CHECKS main checks /etc/port-update/checks
+config_get CHECK_TIMEOUT main check_timeout 60
+
+STATE=/etc/port-update
+WORK=/tmp/port-update
+RUNNING=$(cat /etc/port_release 2>/dev/null)
+BOARD=$(tr ',' '_' </tmp/sysinfo/board_name)
+
+log() {
+  logger -t port-update "$*"
+  echo "$*"
+}
+
+minutes() {
+  echo "$1" | awk '{ print substr($0, 1, 2) * 60 + substr($0, 3, 2) }'
+}
+
+in_window() {
+  now=$(minutes "$(date +%H%M)")
+  [ "$now" -ge "$(minutes "$START")" ] && [ "$now" -lt "$(minutes "$END")" ]
+}
+
+packets() {
+  echo $(($(cat "/sys/class/net/$IDLE_DEVICE/statistics/rx_packets") + $(cat "/sys/class/net/$IDLE_DEVICE/statistics/tx_packets")))
+}
+
+idle() {
+  first=$(packets)
+  sleep "$IDLE_WINDOW"
+  [ $((($(packets) - first) / IDLE_WINDOW)) -le "$IDLE_PPS" ]
+}
+
+uptime_seconds() {
+  cut -d. -f1 /proc/uptime
+}
+
+running_tag() {
+  echo "build-$(echo "$RUNNING" | cut -c1-12)"
+}
+
+bad() {
+  grep -qx "$1" "$STATE/bad" 2>/dev/null
+}
+
+old_enough() {
+  day=$(echo "$1" | cut -c1-10)
+  [ -n "$day" ] || return 1
+  age=$((($(date +%s) - $(date -d "$day" +%s)) / 86400))
+  [ "$age" -ge "$MIN_AGE" ]
+}
+
+load_release() {
+  TAG=$(jsonfilter -i "$1/release.json" -e '@.tag_name')
+  IMAGE=$(jsonfilter -i "$1/release.json" -e '@.assets[*].name' | grep -m1 -- "-${BOARD}-squashfs.bin$")
+  [ -n "$TAG" ] && [ -n "$IMAGE" ]
+}
+
+pick_release() {
+  list=$WORK/latest/releases.json
+  rm -rf "$WORK/latest"
+  mkdir -p "$WORK/latest"
+  uclient-fetch -q -T 30 -O "$list" "$URL" || {
+    REASON="the release list cannot be fetched"
+    return 1
+  }
+  i=0
+  while tag=$(jsonfilter -i "$list" -e "@[$i].tag_name"); do
+    if [ -n "$RUNNING" ] && [ "$tag" = "$(running_tag)" ]; then
+      REASON="this router runs the newest release that is old enough"
+      return 1
+    fi
+    if [ "$(jsonfilter -i "$list" -e "@[$i].prerelease")" != true ] && ! bad "$tag" &&
+      old_enough "$(jsonfilter -i "$list" -e "@[$i].published_at")"; then
+      jsonfilter -i "$list" -e "@[$i]" >"$WORK/latest/release.json"
+      load_release "$WORK/latest" && return 0
+    fi
+    i=$((i + 1))
+  done
+  REASON="no release newer than the running one is $MIN_AGE days old"
+  return 1
+}
+
+fetch_tag() {
+  rm -rf "$1"
+  mkdir -p "$1"
+  uclient-fetch -q -T 30 -O "$1/release.json" "$URL/tags/$2" && load_release "$1"
+}
+
+verify() {
+  dir=$1
+  usign -q -V -m "$dir/SHA256SUMS" -P "$KEYS" -x "$dir/SHA256SUMS.sig" || {
+    log "the signature of SHA256SUMS does not match a trusted key"
+    return 1
+  }
+  line=$(grep -- " $2\$" "$dir/SHA256SUMS")
+  [ -n "$line" ] || {
+    log "SHA256SUMS lists no $2"
+    return 1
+  }
+  (cd "$dir" && echo "$line" | sha256sum -c -s) || {
+    log "$2 does not match its signed checksum"
+    return 1
+  }
+}
+
+download() {
+  dir=$1
+  for name in SHA256SUMS SHA256SUMS.sig "$IMAGE"; do
+    url=$(jsonfilter -i "$dir/release.json" -e "@.assets[@.name='$name'].browser_download_url")
+    [ -n "$url" ] || {
+      log "release $TAG has no $name"
+      return 1
+    }
+    uclient-fetch -q -T 60 -O "$dir/$name" "$url" || {
+      log "download of $name failed"
+      return 1
+    }
+  done
+  verify "$dir" "$IMAGE"
+}
+
+keep_running() {
+  [ -f "$STATE/previous.bin" ] && return 0
+  tag=$(running_tag)
+  if [ -z "$RUNNING" ] || ! fetch_tag "$WORK/running" "$tag"; then
+    log "no published release $tag matches the running image, so an update would have no way back"
+    return 1
+  fi
+  download "$WORK/running" || return 1
+  cp "$WORK/running/$IMAGE" "$STATE/previous.bin"
+  log "kept $tag, the running release, as the way back"
+}
+
+checks() {
+  for check in "$CHECKS"/*; do
+    [ -f "$check" ] && [ -x "$check" ] || continue
+    if timeout "$CHECK_TIMEOUT" "$check" >/dev/null 2>&1; then
+      echo "check ${check##*/}"
+    else
+      echo "failing ${check##*/}"
+    fi
+  done
+}
+
+snapshot() {
+  checks | grep '^check '
+  ubus call network.interface dump | jsonfilter -e '@.interface[@.up=true].interface' | sed 's/^/interface /'
+  ubus call network.wireless status | jsonfilter -e '@[@.up=true].interfaces[*].ifname' | sed 's/^/wifi /'
+  wg show all latest-handshakes 2>/dev/null | awk -v now="$(date +%s)" '$3 > now - 180 { print "tunnel " $1 }'
+  for script in /etc/rc.d/S*; do
+    name=${script##*/S??}
+    ubus call service list "{\"name\":\"$name\"}" 2>/dev/null | jsonfilter -e '@.*.instances[@.running=true].respawn' >/dev/null 2>&1 &&
+      echo "service $name"
+  done
+  nslookup openwrt.org 127.0.0.1 >/dev/null 2>&1 && echo "dns"
+  if [ -z "$(ls -A /sys/fs/pstore 2>/dev/null)" ] && ! dmesg | grep -q -E 'Internal error: Oops|BUG: |Kernel panic - not syncing|Unable to handle kernel'; then
+    echo "no crash"
+  fi
+}
+
+flash() {
+  cp "$1" "$WORK/flash.bin"
+  sysupgrade "$WORK/flash.bin"
+}
+
+run() {
+  [ "$ENABLED" = 1 ] || exit 0
+  [ -n "$URL" ] || exit 0
+  in_window || exit 0
+  exec 9>/var/lock/port-update.lock
+  flock -n 9 || exit 0
+  mkdir -p "$STATE"
+  [ -f "$STATE/pending" ] && exit 0
+  pick_release || exit 0
+  idle || exit 0
+  download "$WORK/latest" || exit 1
+  sysupgrade -T "$WORK/latest/$IMAGE" || {
+    log "sysupgrade refuses $IMAGE of $TAG"
+    echo "$TAG" >>"$STATE/bad"
+    exit 1
+  }
+  new=$TAG
+  new_image=$IMAGE
+  keep_running || exit 1
+  snapshot >"$STATE/before"
+  cp "$WORK/latest/$new_image" "$STATE/pending.bin"
+  echo "$new" >"$STATE/pending"
+  log "updating from ${RUNNING:-an unknown build} to $new"
+  flash "$STATE/pending.bin"
+}
+
+healthy() {
+  snapshot >"$WORK/after"
+  FAILED=$(grep -vxF -f "$WORK/after" "$STATE/before" | tr '\n' ';')
+  [ -z "$FAILED" ]
+}
+
+boot() {
+  [ -f "$STATE/pending" ] || exit 0
+  tag=$(cat "$STATE/pending")
+  mkdir -p "$WORK"
+  deadline=$(($(uptime_seconds) + SETTLE))
+  until healthy; do
+    if [ "$(uptime_seconds)" -ge "$deadline" ]; then
+      echo "$tag" >>"$STATE/bad"
+      rm -f "$STATE/pending" "$STATE/pending.bin" "$STATE/before"
+      log "$tag lost what worked before: $FAILED going back to the previous image"
+      flash "$STATE/previous.bin"
+      return
+    fi
+    sleep 30
+  done
+  mv "$STATE/pending.bin" "$STATE/previous.bin"
+  rm -f "$STATE/pending" "$STATE/before"
+  log "$tag runs and everything that worked before works"
+}
+
+check() {
+  echo "running: ${RUNNING:-unknown}"
+  echo "enabled: $ENABLED, release source: ${URL:-none}"
+  if [ -f "$STATE/previous.bin" ]; then
+    echo "way back: the previous image is kept"
+  else
+    echo "way back: the running release $(running_tag) is fetched before the first update"
+  fi
+  echo "watched: $(snapshot | tr '\n' ';')"
+  echo "failing now: $(checks | sed -n 's/^failing //p' | tr '\n' ';')"
+  if pick_release; then
+    echo "next: $TAG, image $IMAGE"
+  else
+    echo "next: none, $REASON"
+  fi
+}
+
+trust() {
+  id=$(usign -F -p "$1") || exit 1
+  mkdir -p "$KEYS"
+  cp "$1" "$KEYS/$id"
+  log "trusting key $id"
+}
+
+case "$1" in
+run) run ;;
+boot) boot ;;
+check) check ;;
+verify) verify "$2" "$3" ;;
+trust) trust "$2" ;;
+*)
+  echo "usage: $0 run|boot|check|verify <dir> <image>|trust <public key>" >&2
+  exit 2
+  ;;
+esac

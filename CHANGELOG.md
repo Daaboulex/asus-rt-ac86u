@@ -33,6 +33,14 @@ also sold as the RT-AC2900, and `asus-rescue`, the Linux tool that flashes it.
   address and answers what other devices start, and reaches nothing: no
   internet, no DNS, no router, no other device. A hardware test checks it
   with two clients on the bridge.
+- `port-update` updates a router from this repository's releases, off until
+  switched on: to the newest release a few days old, signed with the release
+  key the image trusts, in a quiet night window. It keeps the image it ran,
+  notes what works before the update, with any checks the owner adds as files
+  on the router, and flashes the old image back when the update loses any of
+  it. The Firmware workflow signs every build of `main`
+  and publishes it as a release. Each image names its commit in
+  `/etc/port_release`.
 
 ### Changed
 

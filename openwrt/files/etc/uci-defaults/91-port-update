@@ -1,0 +1,12 @@
+uci -q get port_update.main >/dev/null || {
+	touch /etc/config/port_update
+	uci batch <<EOF
+set port_update.main=port_update
+set port_update.main.enabled='0'
+set port_update.main.url='https://api.github.com/repos/Daaboulex/asus-rt-ac86u/releases'
+commit port_update
+EOF
+}
+grep -qx /etc/port-update/ /etc/sysupgrade.conf || echo /etc/port-update/ >>/etc/sysupgrade.conf
+grep -q 'port-update run' /etc/crontabs/root 2>/dev/null || echo '*/15 * * * * /usr/sbin/port-update run' >>/etc/crontabs/root
+/etc/init.d/port-update enable
