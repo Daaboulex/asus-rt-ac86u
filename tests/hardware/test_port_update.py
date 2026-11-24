@@ -4,7 +4,7 @@ import os
 import re
 import subprocess
 import time
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -135,12 +135,35 @@ def test_an_update_needs_a_trusted_signature_and_its_checksum(router, remote, tm
     assert tampered.returncode != 0, "an image changed after signing was accepted"
 
 
+def next_for(router, root: Path, releases: list[dict]) -> str:
+    publish(root, releases)
+    router.upload(root / "releases" / "index.html", f"{SITE}/releases/index.html")
+    answer = router.run(f"{UPDATER} check")
+    return next(line for line in answer.splitlines() if line.startswith("next:"))
+
+
+@pytest.fixture
+def release_site(router, remote, tmp_path):
+    configure(
+        router,
+        {"url": f"{SOURCE}/releases", "min_age_days": "3", "start": "0300", "end": "0500"},
+    )
+    root = tmp_path / "site"
+    publish(root, [])
+    serve(router, root)
+    yield root
+    stop_serving(router)
+
+
+def published(days_ago: int) -> str:
+    return (datetime.now(UTC) - timedelta(days=days_ago)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
 def test_the_router_picks_the_newest_release_old_enough_and_newer_than_its_own(
-    router, remote, tmp_path
+    router, release_site
 ):
     running = release_json(running_tag(router))
-    today = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-    young = release_json("build-test-young", published=today)
+    young = release_json("build-test-young", published=published(0))
     newer = release_json("build-test-newer")
     older = release_json("build-test-older")
     prerelease = release_json("build-test-prerelease", prerelease=True)
@@ -152,20 +175,24 @@ def test_the_router_picks_the_newest_release_old_enough_and_newer_than_its_own(
         ([prerelease, running], "next: none"),
         ([running, older], "next: none"),
     ]
-    configure(router, {"url": f"{SOURCE}/releases", "min_age_days": "3"})
-    root = tmp_path / "site"
-    publish(root, [running])
-    serve(router, root)
-    try:
-        for releases, expected in cases:
-            publish(root, releases)
-            router.upload(root / "releases" / "index.html", f"{SITE}/releases/index.html")
-            answer = router.run(f"{UPDATER} check")
-            picked = next(line for line in answer.splitlines() if line.startswith("next:"))
-            order = [r["tag_name"] for r in releases]
-            assert picked.startswith(expected), f"for {order} the router chose {picked!r}"
-    finally:
-        stop_serving(router)
+    for releases, expected in cases:
+        picked = next_for(router, release_site, releases)
+        order = [r["tag_name"] for r in releases]
+        assert picked.startswith(expected), f"for {order} the router chose {picked!r}"
+
+
+def test_the_check_names_the_release_it_waits_for_and_when_it_is_due(router, release_site):
+    running = release_json(running_tag(router))
+    youngest = release_json("build-test-youngest", published=published(0))
+    young = release_json("build-test-young", published=published(1))
+    due = (datetime.now(UTC) - timedelta(days=1) + timedelta(days=3)).date().isoformat()
+    waiting = next_for(router, release_site, [youngest, young, running])
+    assert f"build-test-young turns 3 days old on {due} and is due between 0300 and 0500" in (
+        waiting
+    ), f"the check does not name the release that falls due first: {waiting!r}"
+    assert "youngest" not in waiting, f"the check names a release due later: {waiting!r}"
+    current = next_for(router, release_site, [running])
+    assert "due" not in current, f"the check names a release with none waiting: {current!r}"
 
 
 def test_the_check_watches_what_works_now(router):

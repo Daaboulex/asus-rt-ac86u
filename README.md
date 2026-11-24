@@ -118,7 +118,9 @@ own, for a VPN, a blocklist or a firewall rule, go into `/etc/port-update/checks
 on the router: every executable file there is one check, passing when it exits
 0 within a minute. They follow the same rule as the rest: a check that passed
 before an update must pass after it. `port-update check` lists the ones failing
-now, and `chmod -x` switches one off. The folder survives every update.
+now, and `chmod -x` switches one off. The folder survives every update. It also
+names the release the router runs, the one it waits for and the day that one
+falls due.
 
 A router takes a release signed with any key in `/etc/port-update/keys`. The
 image brings the one from `openwrt/release-key.pub`; `port-update trust

@@ -77,7 +77,9 @@ in the package build; the tests in `tests/hardware` run against a router.
   trusts the release key under the name `usign` looks it up by:
   `test_the_image_trusts_the_release_key_under_its_usign_id`. It takes the
   newest release old enough and never an older one than it runs:
-  `test_the_router_picks_the_newest_release_old_enough_and_newer_than_its_own`.
+  `test_the_router_picks_the_newest_release_old_enough_and_newer_than_its_own`,
+  and its check names the release that falls due next and the day:
+  `test_the_check_names_the_release_it_waits_for_and_when_it_is_due`.
   An update that loses what worked before is flashed back and never taken
   again: `test_the_check_watches_what_works_now`,
   `test_the_owners_checks_join_the_watch_and_report_what_fails` and

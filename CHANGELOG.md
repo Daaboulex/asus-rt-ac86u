@@ -40,6 +40,8 @@ also sold as the RT-AC2900, and `asus-rescue`, the Linux tool that flashes it.
   on the router, and flashes the old image back when the update loses any of
   it. The Firmware workflow signs every build of `main` and publishes it as
   a release. Each image names its commit in `/etc/port_release`.
+  `port-update check` names the release a router waits for and the day it
+  falls due.
 - The README installs from a signed release as well as from a build of your
   own, says which key a router trusts, and how a fork publishes its own
   releases.

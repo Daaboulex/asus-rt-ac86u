@@ -56,11 +56,14 @@ bad() {
   grep -qx "$1" "$STATE/bad" 2>/dev/null
 }
 
-old_enough() {
+due_seconds() {
   day=$(echo "$1" | cut -c1-10)
   [ -n "$day" ] || return 1
-  age=$((($(date +%s) - $(date -d "$day" +%s)) / 86400))
-  [ "$age" -ge "$MIN_AGE" ]
+  echo $(($(date -d "$day" +%s) + MIN_AGE * 86400))
+}
+
+old_enough() {
+  due=$(due_seconds "$1") && [ "$(date +%s)" -ge "$due" ]
 }
 
 load_release() {
@@ -77,20 +80,26 @@ pick_release() {
     REASON="the release list cannot be fetched"
     return 1
   }
+  REASON="no release newer than the running one is $MIN_AGE days old"
+  waiting=
   i=0
   while tag=$(jsonfilter -i "$list" -e "@[$i].tag_name"); do
     if [ -n "$RUNNING" ] && [ "$tag" = "$(running_tag)" ]; then
       REASON="this router runs the newest release that is old enough"
-      return 1
+      break
     fi
-    if [ "$(jsonfilter -i "$list" -e "@[$i].prerelease")" != true ] && ! bad "$tag" &&
-      old_enough "$(jsonfilter -i "$list" -e "@[$i].published_at")"; then
-      jsonfilter -i "$list" -e "@[$i]" >"$WORK/latest/release.json"
-      load_release "$WORK/latest" && return 0
+    published=$(jsonfilter -i "$list" -e "@[$i].published_at")
+    if [ "$(jsonfilter -i "$list" -e "@[$i].prerelease")" != true ] && ! bad "$tag"; then
+      if old_enough "$published"; then
+        jsonfilter -i "$list" -e "@[$i]" >"$WORK/latest/release.json"
+        load_release "$WORK/latest" && return 0
+      elif due=$(due_seconds "$published"); then
+        waiting="$tag turns $MIN_AGE days old on $(date -d "@$due" +%Y-%m-%d) and is due between $START and $END"
+      fi
     fi
     i=$((i + 1))
   done
-  REASON="no release newer than the running one is $MIN_AGE days old"
+  [ -z "$waiting" ] || REASON="$REASON; $waiting"
   return 1
 }
 
