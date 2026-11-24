@@ -19,6 +19,7 @@ TEST_KEYS = f"{STATE}/hardware-test-keys"
 TEST_CHECK = f"{STATE}/checks/hardware-test"
 OLD = "2000-01-01T00:00:00Z"
 UPDATER = f"UCI_CONFIG_DIR={REMOTE}/config /usr/sbin/port-update"
+NEWEST = "next: none, this router runs the newest release that is old enough"
 
 
 def signify(*args: str, cwd) -> None:
@@ -135,6 +136,28 @@ def test_an_update_needs_a_trusted_signature_and_its_checksum(router, remote, tm
     assert tampered.returncode != 0, "an image changed after signing was accepted"
 
 
+def test_the_router_downloads_and_verifies_the_newest_published_release(router, remote):
+    source = router.run("uci -q get port_update.main.url || true").strip()
+    if not source:
+        pytest.skip("port_update.main.url names no release source")
+    router.run(f"uclient-fetch -q -T 30 -O {REMOTE}/releases.json '{source}'")
+    release = json.loads(router.run(f"jsonfilter -i {REMOTE}/releases.json -e '@[0]'"))
+    urls = {a["name"]: a["browser_download_url"] for a in release["assets"]}
+    for name in ("SHA256SUMS", "SHA256SUMS.sig", IMAGE):
+        assert name in urls, f"release {release['tag_name']} carries no {name}"
+        fetched = router.ssh(
+            f"uclient-fetch -q -T 60 -O {REMOTE}/{name} '{urls[name]}'", timeout=300
+        )
+        assert fetched.returncode == 0, (
+            f"the router cannot download {name} of {release['tag_name']} from {urls[name]}"
+        )
+    verified = router.ssh(f"/usr/sbin/port-update verify {REMOTE} {IMAGE}")
+    assert verified.returncode == 0, (
+        f"release {release['tag_name']} does not verify against the keys the image trusts: "
+        f"{verified.stdout}{verified.stderr}"
+    )
+
+
 def next_for(router, root: Path, releases: list[dict]) -> str:
     publish(root, releases)
     router.upload(root / "releases" / "index.html", f"{SITE}/releases/index.html")
@@ -168,12 +191,12 @@ def test_the_router_picks_the_newest_release_old_enough_and_newer_than_its_own(
     older = release_json("build-test-older")
     prerelease = release_json("build-test-prerelease", prerelease=True)
     cases = [
-        ([running], "next: none"),
+        ([running], NEWEST),
         ([newer, running], "next: build-test-newer"),
-        ([young, running], "next: none"),
+        ([young, running], f"{NEWEST}; build-test-young"),
         ([young, newer, running], "next: build-test-newer"),
-        ([prerelease, running], "next: none"),
-        ([running, older], "next: none"),
+        ([prerelease, running], NEWEST),
+        ([running, older], NEWEST),
     ]
     for releases, expected in cases:
         picked = next_for(router, release_site, releases)
@@ -192,7 +215,7 @@ def test_the_check_names_the_release_it_waits_for_and_when_it_is_due(router, rel
     ), f"the check does not name the release that falls due first: {waiting!r}"
     assert "youngest" not in waiting, f"the check names a release due later: {waiting!r}"
     current = next_for(router, release_site, [running])
-    assert "due" not in current, f"the check names a release with none waiting: {current!r}"
+    assert current == NEWEST, f"the check names a release with none waiting: {current!r}"
 
 
 def test_the_check_watches_what_works_now(router):

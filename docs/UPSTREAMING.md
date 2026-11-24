@@ -29,7 +29,7 @@ where each one goes and what a submission still needs.
    It carries the Linux patches in `target/linux/bcm4908/patches-6.18` under
    OpenWrt's numbers for pending patches until Linux merges them, and the
    brcmfmac patches in `package/kernel/mac80211/patches/brcm` the same way.
-3. procd, ucode and hostapd, each on its own.
+3. procd, ucode, uclient and hostapd, each on its own.
 
 ## Where each patch goes
 
@@ -52,5 +52,6 @@ Kernel patches are named by their number in `patches-6.18` or
 | 0026 | hostapd | The `hostap` list, then OpenWrt's hostapd package | |
 | 0028 | ucode | The ucode repository | |
 | 0029 | wifi-scripts | `openwrt/openwrt` | |
+| 0048, 0049 | uclient | OpenWrt's `uclient` repository | |
 | 0036 | Stays here | | A vendor GPL drop from a mirror; linux-firmware takes Broadcom firmware from Broadcom only. |
 | Image defaults (packages, LuCI over HTTPS) | Stay here | | Product choices, not device support. |

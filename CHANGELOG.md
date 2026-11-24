@@ -58,3 +58,11 @@ also sold as the RT-AC2900, and `asus-rescue`, the Linux tool that flashes it.
   one whose size stayed the same. Every file in the Nix store carries the
   same time, so a rebuild after the pins moved kept such a file stale and
   could mix the old and the new tree.
+- A router downloads releases from GitHub. uclient looked for the end of
+  each header line inside a 4096 byte read buffer, and GitHub's download
+  redirect carries a 4203 byte line, so every release download timed out.
+  uclient now reads header lines up to 100 KiB.
+- uclient follows a redirect to a relative address on 64-bit targets. It
+  passed its lengths to `calloc_a()` as `int`, which leaves stale upper bits
+  there, so the allocation asked for about 508 GiB and the redirect ended
+  with HTTP error 302.

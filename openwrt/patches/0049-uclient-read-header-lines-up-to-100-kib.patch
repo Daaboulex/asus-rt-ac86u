@@ -1,0 +1,47 @@
+diff --git a/package/libs/uclient/patches/101-uclient-http-read-header-lines-up-to-100-kib.patch b/package/libs/uclient/patches/101-uclient-http-read-header-lines-up-to-100-kib.patch
+new file mode 100644
+index 0000000..b61b1bf
+--- /dev/null
++++ b/package/libs/uclient/patches/101-uclient-http-read-header-lines-up-to-100-kib.patch
+@@ -0,0 +1,41 @@
++From: Daaboulex <39669593+Daaboulex@users.noreply.github.com>
++Subject: [PATCH] uclient-http: read header lines up to 100 KiB
++
++The response is parsed one header line at a time from the stream's
++read buffer, which ustream sizes at 4096 bytes by default. A header
++line longer than that never ends inside the buffer, so the parser
++waits for data the full buffer can no longer take, and the request
++runs into its timeout. GitHub sends a 4203 byte
++Content-Security-Policy line with every release download redirect, so
++no release file can be fetched from there. Give the read buffer room
++for 100 KiB, the longest header line curl accepts
++(CURL_MAX_HTTP_HEADER).
++
++---
++--- a/uclient-http.c
+++++ b/uclient-http.c
++@@ -34,6 +34,8 @@
++ #include "uclient-utils.h"
++ #include "uclient-backend.h"
++ 
+++#define HTTP_LINE_MAX	(100 * 1024)
+++
++ enum auth_type {
++ 	AUTH_TYPE_UNKNOWN,
++ 	AUTH_TYPE_NONE,
++@@ -933,6 +935,7 @@
++ 	uh->ssl = false;
++ 
++ 	us->string_data = true;
+++	us->r.buffer_len = HTTP_LINE_MAX;
++ 	us->notify_state = uclient_notify_state;
++ 	us->notify_read = uclient_notify_read;
++ 	us->notify_write = uclient_notify_write;
++@@ -1019,6 +1022,7 @@
++ 		return UCLIENT_ERROR_CONNECT;
++ 
++ 	us->string_data = true;
+++	us->r.buffer_len = HTTP_LINE_MAX;
++ 	us->notify_state = uclient_ssl_notify_state;
++ 	us->notify_read = uclient_ssl_notify_read;
++ 	us->notify_write = uclient_ssl_notify_write;

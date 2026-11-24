@@ -1,0 +1,48 @@
+diff --git a/package/libs/uclient/patches/100-uclient-pass-calloc_a-lengths-as-size_t.patch b/package/libs/uclient/patches/100-uclient-pass-calloc_a-lengths-as-size_t.patch
+new file mode 100644
+index 0000000..3c93425
+--- /dev/null
++++ b/package/libs/uclient/patches/100-uclient-pass-calloc_a-lengths-as-size_t.patch
+@@ -0,0 +1,42 @@
++From: Daaboulex <39669593+Daaboulex@users.noreply.github.com>
++Subject: [PATCH] uclient: pass calloc_a lengths as size_t
++
++__calloc_a() reads every length with va_arg(ap, size_t), but
++__uclient_get_url() and uclient_get_url_location() pass theirs as int.
++On a 64-bit target an int variadic argument that goes on the stack
++fills only the low half of its slot, so the length read back carries
++whatever the upper half held. On aarch64 the fourth length of
++uclient_get_url_location() is the ninth argument and lands there: a
++redirect to a relative location then asks for about 508 GiB, calloc
++fails, and the redirect ends with "HTTP error 302". Since libubox
++9b48801 ("utils: fix integer overflow in __calloc_a()") the lengths
++are summed as size_t; the int sum before it dropped the stale bits.
++Declare the lengths size_t.
++
++---
++--- a/uclient.c
+++++ b/uclient.c
++@@ -57,7 +57,7 @@
++ 
++ static struct uclient_url *
++ __uclient_get_url(const struct uclient_backend *backend,
++-		  const char *host, int host_len,
+++		  const char *host, size_t host_len,
++ 		  const char *location, const char *auth_str)
++ {
++ 	struct uclient_url *url;
++@@ -137,10 +137,10 @@
++ {
++ 	struct uclient_url *new_url;
++ 	char *host_buf, *uri_buf, *auth_buf, *port_buf;
++-	int host_len = strlen(url->host) + 1;
++-	int auth_len = url->auth ? strlen(url->auth) + 1 : 0;
++-	int port_len = url->port ? strlen(url->port) + 1 : 0;
++-	int uri_len;
+++	size_t host_len = strlen(url->host) + 1;
+++	size_t auth_len = url->auth ? strlen(url->auth) + 1 : 0;
+++	size_t port_len = url->port ? strlen(url->port) + 1 : 0;
+++	size_t uri_len;
++ 
++ 	if (strstr(location, "://"))
++ 		return uclient_get_url(location, url->auth);

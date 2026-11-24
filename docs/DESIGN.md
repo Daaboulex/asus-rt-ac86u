@@ -75,8 +75,10 @@ in the package build; the tests in `tests/hardware` run against a router.
   signature from a key it trusts:
   `test_an_update_needs_a_trusted_signature_and_its_checksum`, and the image
   trusts the release key under the name `usign` looks it up by:
-  `test_the_image_trusts_the_release_key_under_its_usign_id`. It takes the
-  newest release old enough and never an older one than it runs:
+  `test_the_image_trusts_the_release_key_under_its_usign_id`. It downloads
+  and verifies the newest release from its release source:
+  `test_the_router_downloads_and_verifies_the_newest_published_release`. It
+  takes the newest release old enough and never an older one than it runs:
   `test_the_router_picks_the_newest_release_old_enough_and_newer_than_its_own`,
   and its check names the release that falls due next and the day:
   `test_the_check_names_the_release_it_waits_for_and_when_it_is_due`.
