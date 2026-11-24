@@ -82,6 +82,7 @@ pick_release() {
   }
   REASON="no release newer than the running one is $MIN_AGE days old"
   waiting=
+  waiting_due=
   i=0
   while tag=$(jsonfilter -i "$list" -e "@[$i].tag_name"); do
     if [ -n "$RUNNING" ] && [ "$tag" = "$(running_tag)" ]; then
@@ -93,7 +94,8 @@ pick_release() {
       if old_enough "$published"; then
         jsonfilter -i "$list" -e "@[$i]" >"$WORK/latest/release.json"
         load_release "$WORK/latest" && return 0
-      elif due=$(due_seconds "$published"); then
+      elif due=$(due_seconds "$published") && { [ -z "$waiting_due" ] || [ "$due" -lt "$waiting_due" ]; }; then
+        waiting_due=$due
         waiting="$tag turns $MIN_AGE days old on $(date -d "@$due" +%Y-%m-%d) and is due between $START and $END"
       fi
     fi

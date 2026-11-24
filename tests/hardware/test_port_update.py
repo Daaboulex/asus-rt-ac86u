@@ -208,12 +208,14 @@ def test_the_check_names_the_release_it_waits_for_and_when_it_is_due(router, rel
     running = release_json(running_tag(router))
     youngest = release_json("build-test-youngest", published=published(0))
     young = release_json("build-test-young", published=published(1))
+    same_day = release_json("build-test-same-day", published=published(1))
     due = (datetime.now(UTC) - timedelta(days=1) + timedelta(days=3)).date().isoformat()
-    waiting = next_for(router, release_site, [youngest, young, running])
+    waiting = next_for(router, release_site, [youngest, young, same_day, running])
     assert f"build-test-young turns 3 days old on {due} and is due between 0300 and 0500" in (
         waiting
-    ), f"the check does not name the release that falls due first: {waiting!r}"
+    ), f"the check does not name the newest release that falls due first: {waiting!r}"
     assert "youngest" not in waiting, f"the check names a release due later: {waiting!r}"
+    assert "same-day" not in waiting, f"the check names an older release due that day: {waiting!r}"
     current = next_for(router, release_site, [running])
     assert current == NEWEST, f"the check names a release with none waiting: {current!r}"
 
