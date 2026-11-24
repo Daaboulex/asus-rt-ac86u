@@ -15,7 +15,24 @@ flash, the Wi-Fi limits above all.
 
 ## Install
 
-Work in a clone of this repository. Build the image first:
+Work in a clone of this repository. Take a released image or build one, then
+put it on the router through rescue mode.
+
+### A released image
+
+Every build of `main` is published under
+[Releases](https://github.com/Daaboulex/asus-rt-ac86u/releases) as the image,
+its `SHA256SUMS` and `SHA256SUMS.sig`, the signature made with the release key
+whose public half is [`openwrt/release-key.pub`](openwrt/release-key.pub).
+Download the three files of one release into a folder of their own, and check
+the signature and the checksum from there:
+
+```bash
+nix shell 'nixpkgs#signify' -c signify -V -p <clone>/openwrt/release-key.pub -m SHA256SUMS -x SHA256SUMS.sig
+sha256sum -c SHA256SUMS
+```
+
+### An image of your own
 
 ```bash
 nix run .#openwrt-build -- rt-ac86u
@@ -23,10 +40,14 @@ nix run .#openwrt-build -- rt-ac86u
 
 The image lands in `.devshell/openwrt/bin/targets/bcm4908/generic/`. A first
 build takes tens of gigabytes and runs on x86_64 and aarch64 Linux, fastest
-with many cores.
-Note the image's SHA256, as `sha256sum` prints it.
+with many cores. The image trusts the key in `openwrt/release-key.pub` as your
+clone has it, so it takes this repository's releases unless you put the
+public half of your own key there first (see
+[Automatic updates](#automatic-updates)).
 
-Then put the image on the router through rescue mode:
+### Flash it through rescue mode
+
+Note the image's SHA256, as `SHA256SUMS` or `sha256sum` gives it. Then:
 
 1. Power the router off, hold Reset, power it on, and release Reset when the
    power LED blinks slowly.
@@ -61,8 +82,8 @@ port leaves alone.
 
 ## Updating
 
-Build the new image the same way. Then flash it from the running router with
-`sysupgrade`, which keeps the settings:
+Take a newer released image or build one, as under [Install](#install). Then
+flash it from the running router with `sysupgrade`, which keeps the settings:
 
 ```bash
 ssh root@192.168.1.1 'cat > /tmp/firmware.bin' < <image>.bin
@@ -99,10 +120,27 @@ on the router: every executable file there is one check, passing when it exits
 before an update must pass after it. `port-update check` lists the ones failing
 now, and `chmod -x` switches one off. The folder survives every update.
 
-A fork signs with its own key: make a key pair with
-`signify -G -n -p openwrt/release-key.pub -s release.sec`, store the secret
-key as the repository secret `RELEASE_SIGNING_KEY`, and keep a copy of it
-off GitHub, since a router trusts only the keys its image carries.
+A router takes a release signed with any key in `/etc/port-update/keys`. The
+image brings the one from `openwrt/release-key.pub`; `port-update trust
+<public key>` adds another and deleting its file there drops it. A router
+updates itself only while it runs a published release, since that release is
+its way back: after you flash an image of your own, it waits until you flash a
+release by hand.
+
+To follow releases of your own, publish them from a fork:
+
+1. Replace the key: delete `openwrt/release-key.pub`, which signify will not
+   overwrite, run `signify -G -n -p openwrt/release-key.pub -s
+   release-key.sec`, and commit the new `openwrt/release-key.pub`.
+2. Store the secret half as `RELEASE_SIGNING_KEY` in a repository environment
+   named `release` that only `main` may use, and keep a copy off GitHub.
+3. Flash one of the fork's releases onto each router and set
+   `port_update.main.url` to the fork's releases address,
+   `https://api.github.com/repos/<owner>/<repository>/releases`.
+
+A router trusts only the keys its image carries, so changing the key later
+means flashing each router once by hand with an image that carries the new
+one.
 
 ## Keeping a device local
 
@@ -183,14 +221,14 @@ Try these in order, lightest first.
    another one: a press after that window only turns the LEDs off, and the
    next press turns them back on.
 4. The firmware no longer boots. Use rescue mode, as under
-   [Install](#install).
+   [Flash it through rescue mode](#flash-it-through-rescue-mode).
 
 ## More
 
 - [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md): the unit, the known limits
   and their evidence.
 - [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md): the dev shell, how the image is
-  built, and what each stage of an update proves.
+  built, what each stage of an update proves, and the release key.
 - [docs/DESIGN.md](docs/DESIGN.md): how the port is built, what it
   guarantees, and the hardware facts read from the unit.
 - [docs/UPSTREAMING.md](docs/UPSTREAMING.md): where each patch would go

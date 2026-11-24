@@ -231,9 +231,10 @@ Each step is done and recorded before the next starts.
 6. Access point on each band; clients hold association and traffic.
 7. `sysupgrade` to a second build.
 
-The Firmware workflow, which runs step 1 on a GitHub runner, is outside the
-set of workflows the fleet watch requires to be green, so its failure surfaces
-only through the issue its report job opens.
+The Firmware workflow, which runs step 1 on a GitHub runner and publishes
+each clean build of `main` as a signed release, is outside the set of
+workflows the fleet watch requires to be green, so its failure surfaces only
+through the issue its report job opens.
 
 ## Decisions (maintainer, 2026-11-10)
 

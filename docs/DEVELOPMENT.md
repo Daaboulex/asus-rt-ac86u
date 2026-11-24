@@ -48,14 +48,29 @@ GitHub runner after the pins have landed, so a break there shows up as a
 failed Firmware run and its issue, with the pins already on `main`.
 
 A clean Firmware run keeps the image, with a `SHA256SUMS` file, as an
-artifact of the run:
+artifact of the run. On `main` it then signs `SHA256SUMS` with the release
+key, checks the signature against `openwrt/release-key.pub`, and publishes the
+image, `SHA256SUMS` and `SHA256SUMS.sig` as the release `build-<commit>`. A
+run that lacks the secret, or whose secret does not match the public half in
+the repository, fails there rather than publish a release no router would
+take.
 
-```bash
-sha256sum -c SHA256SUMS
-```
+No runner has a router, so a release is published without a hardware test.
+What guards a router is its own updater: it takes a release only once it is a
+few days old, notes what works before the update, and goes back when the
+update loses any of it (README, Automatic updates). `hardware-test` against
+the flashed router stays the check before a change lands, run by hand.
 
-No runner has a router. The last stage is `hardware-test` against the flashed
-router, run by hand.
+## The release key
+
+The public half is `openwrt/release-key.pub`; the image build installs it as
+`/etc/port-update/keys/<id>`, the name `usign` looks a key up by. The secret
+half is the secret `RELEASE_SIGNING_KEY` of the repository environment
+`release`, which only `main` may use; GitHub never shows it again, so the
+maintainer keeps a copy off GitHub. Without the secret no release is
+published, and routers keep running what they have. A new key reaches a
+router only through an image that carries it, so changing the key, after a
+loss or a leak, means flashing each router once by hand.
 
 ## Notes on the hardware tests
 
