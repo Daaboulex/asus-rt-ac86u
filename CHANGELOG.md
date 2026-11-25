@@ -54,6 +54,11 @@ also sold as the RT-AC2900, and `asus-rescue`, the Linux tool that flashes it.
 
 ### Fixed
 
+- A router takes a newer release wherever GitHub lists it. `port-update`
+  read the release list as newest first and stopped at the release it runs,
+  so a newer release listed below that one, or on a later page, was never
+  taken. It now orders the releases by their publish date and reads every
+  page of the list.
 - `openwrt-build` copies every file of the pinned trees that changed, also
   one whose size stayed the same. Every file in the Nix store carries the
   same time, so a rebuild after the pins moved kept such a file stale and

@@ -2,6 +2,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import subprocess
 import time
 from datetime import UTC, datetime, timedelta
@@ -14,6 +15,9 @@ REMOTE = "/tmp/hardware-test-port-update"
 IMAGE = "openwrt-bcm4908-generic-asus_rt-ac86u-squashfs.bin"
 SITE = "/tmp/hardware-test-site"
 SOURCE = "http://127.0.0.1:8471"
+RELEASES = f"{SOURCE}/cgi-bin/releases"
+PAGE_SERVER = Path(__file__).with_name("release-pages.sh")
+PER_PAGE = 100
 STATE = "/etc/port-update"
 TEST_KEYS = f"{STATE}/hardware-test-keys"
 TEST_CHECK = f"{STATE}/checks/hardware-test"
@@ -53,9 +57,15 @@ def release_json(tag: str, published: str = OLD, prerelease: bool = False) -> di
 
 
 def publish(root: Path, releases: list[dict]) -> None:
-    listing = root / "releases" / "index.html"
-    listing.parent.mkdir(parents=True, exist_ok=True)
-    listing.write_text(json.dumps(releases))
+    pages = root / "pages"
+    if pages.exists():
+        shutil.rmtree(pages)
+    pages.mkdir(parents=True)
+    for start in range(0, len(releases), PER_PAGE):
+        page = pages / f"{start // PER_PAGE + 1}.json"
+        page.write_text(json.dumps(releases[start : start + PER_PAGE]))
+    (root / "cgi-bin").mkdir(exist_ok=True)
+    shutil.copy(PAGE_SERVER, root / "cgi-bin" / "releases")
 
 
 def serve(router, root: Path) -> None:
@@ -68,7 +78,7 @@ def serve(router, root: Path) -> None:
         f"(uhttpd -f -p {SOURCE.removeprefix('http://')} -h {SITE} >/dev/null 2>&1 & "
         f"echo $! > {SITE}.pid)"
     )
-    probe = f"uclient-fetch -q -O /dev/null {SOURCE}/releases"
+    probe = f"uclient-fetch -q -O /dev/null {RELEASES}"
     deadline = time.monotonic() + 30
     while router.ssh(probe).returncode != 0:
         assert time.monotonic() < deadline, "the router does not serve the test releases"
@@ -141,7 +151,8 @@ def test_the_router_downloads_and_verifies_the_newest_published_release(router, 
     if not source:
         pytest.skip("port_update.main.url names no release source")
     router.run(f"uclient-fetch -q -T 30 -O {REMOTE}/releases.json '{source}'")
-    release = json.loads(router.run(f"jsonfilter -i {REMOTE}/releases.json -e '@[0]'"))
+    releases = json.loads(router.run(f"cat {REMOTE}/releases.json"))
+    release = max((r for r in releases if not r["prerelease"]), key=lambda r: r["published_at"])
     urls = {a["name"]: a["browser_download_url"] for a in release["assets"]}
     for name in ("SHA256SUMS", "SHA256SUMS.sig", IMAGE):
         assert name in urls, f"release {release['tag_name']} carries no {name}"
@@ -160,7 +171,9 @@ def test_the_router_downloads_and_verifies_the_newest_published_release(router, 
 
 def next_for(router, root: Path, releases: list[dict]) -> str:
     publish(root, releases)
-    router.upload(root / "releases" / "index.html", f"{SITE}/releases/index.html")
+    router.run(f"rm -rf {SITE}/pages && mkdir {SITE}/pages")
+    for page in (root / "pages").iterdir():
+        router.upload(page, f"{SITE}/pages/{page.name}")
     answer = router.run(f"{UPDATER} check")
     return next(line for line in answer.splitlines() if line.startswith("next:"))
 
@@ -169,7 +182,7 @@ def next_for(router, root: Path, releases: list[dict]) -> str:
 def release_site(router, remote, tmp_path):
     configure(
         router,
-        {"url": f"{SOURCE}/releases", "min_age_days": "3", "start": "0300", "end": "0500"},
+        {"url": RELEASES, "min_age_days": "3", "start": "0300", "end": "0500"},
     )
     root = tmp_path / "site"
     publish(root, [])
@@ -178,25 +191,28 @@ def release_site(router, remote, tmp_path):
     stop_serving(router)
 
 
-def published(days_ago: int) -> str:
-    return (datetime.now(UTC) - timedelta(days=days_ago)).strftime("%Y-%m-%dT%H:%M:%SZ")
+def published(days_ago: int, at: str = "12:00:00") -> str:
+    return f"{(datetime.now(UTC) - timedelta(days=days_ago)).date().isoformat()}T{at}Z"
 
 
 def test_the_router_picks_the_newest_release_old_enough_and_newer_than_its_own(
     router, release_site
 ):
-    running = release_json(running_tag(router))
+    running = release_json(running_tag(router), published=published(10))
     young = release_json("build-test-young", published=published(0))
-    newer = release_json("build-test-newer")
-    older = release_json("build-test-older")
-    prerelease = release_json("build-test-prerelease", prerelease=True)
+    newer = release_json("build-test-newer", published=published(5))
+    older = release_json("build-test-older", published=published(20))
+    prerelease = release_json("build-test-prerelease", published=published(5), prerelease=True)
     cases = [
         ([running], NEWEST),
         ([newer, running], "next: build-test-newer"),
+        ([running, newer], "next: build-test-newer"),
         ([young, running], f"{NEWEST}; build-test-young"),
+        ([running, young], f"{NEWEST}; build-test-young"),
         ([young, newer, running], "next: build-test-newer"),
         ([prerelease, running], NEWEST),
         ([running, older], NEWEST),
+        ([older, running], NEWEST),
     ]
     for releases, expected in cases:
         picked = next_for(router, release_site, releases)
@@ -205,19 +221,30 @@ def test_the_router_picks_the_newest_release_old_enough_and_newer_than_its_own(
 
 
 def test_the_check_names_the_release_it_waits_for_and_when_it_is_due(router, release_site):
-    running = release_json(running_tag(router))
+    running = release_json(running_tag(router), published=published(10))
     youngest = release_json("build-test-youngest", published=published(0))
     young = release_json("build-test-young", published=published(1))
-    same_day = release_json("build-test-same-day", published=published(1))
+    same_day = release_json("build-test-same-day", published=published(1, "06:00:00"))
+    older = release_json("build-test-older", published=published(20))
     due = (datetime.now(UTC) - timedelta(days=1) + timedelta(days=3)).date().isoformat()
-    waiting = next_for(router, release_site, [youngest, young, same_day, running])
+    waiting = next_for(router, release_site, [same_day, running, youngest, young])
     assert f"build-test-young turns 3 days old on {due} and is due between 0300 and 0500" in (
         waiting
     ), f"the check does not name the newest release that falls due first: {waiting!r}"
     assert "youngest" not in waiting, f"the check names a release due later: {waiting!r}"
     assert "same-day" not in waiting, f"the check names an older release due that day: {waiting!r}"
-    current = next_for(router, release_site, [running])
+    current = next_for(router, release_site, [running, older])
     assert current == NEWEST, f"the check names a release with none waiting: {current!r}"
+
+
+def test_the_router_reads_every_page_of_the_release_list(router, release_site):
+    running = release_json(running_tag(router), published=published(10))
+    older = [release_json(f"build-test-old-{n}", published=published(20)) for n in range(PER_PAGE)]
+    newer = release_json("build-test-newer", published=published(5))
+    picked = next_for(router, release_site, [running, *older, newer])
+    assert picked.startswith("next: build-test-newer"), (
+        f"a release on the second page of the list was not seen: {picked!r}"
+    )
 
 
 def test_the_check_watches_what_works_now(router):
@@ -287,14 +314,16 @@ def test_an_update_flashes_a_signed_release_and_goes_back_when_it_loses_a_check(
     root = tmp_path / "site"
     signed(root / "image", image.read_bytes(), tmp_path / "test.sec")
     (root / "releases" / "tags").mkdir(parents=True)
-    (root / "releases" / "tags" / running).write_text(json.dumps(release_json(running)))
+    (root / "releases" / "tags" / running).write_text(
+        json.dumps(release_json(running, published=published(10)))
+    )
     saved = router.run("cat /etc/config/port_update")
     try:
         router.upload(tmp_path / "test.pub", "/tmp/hardware-test-release.pub")
         router.run(
             "uci batch <<EOF\n"
             "set port_update.main.enabled=1\n"
-            f"set port_update.main.url={SOURCE}/releases\n"
+            f"set port_update.main.url={RELEASES}\n"
             f"set port_update.main.keys={TEST_KEYS}\n"
             "set port_update.main.min_age_days=0\n"
             "set port_update.main.start=0000\n"
@@ -306,8 +335,8 @@ def test_an_update_flashes_a_signed_release_and_goes_back_when_it_loses_a_check(
             "EOF\n"
             "/usr/sbin/port-update trust /tmp/hardware-test-release.pub"
         )
-        good = release_json("build-test-good")
-        update(router, root, [good, release_json(running)])
+        good = release_json("build-test-good", published=published(5))
+        update(router, root, [release_json(running, published=published(10)), good])
         settled(router)
         healthy = router.ssh(f"grep -qx build-test-good {STATE}/bad")
         assert healthy.returncode != 0, "a healthy update failed its checks"
@@ -319,7 +348,8 @@ def test_an_update_flashes_a_signed_release_and_goes_back_when_it_loses_a_check(
             f"printf '#!/bin/sh\\n[ -e /tmp/hardware-test-marker ]\\n' > {TEST_CHECK} && "
             f"chmod +x {TEST_CHECK}"
         )
-        updated = update(router, root, [release_json("build-test-bad"), good])
+        bad = release_json("build-test-bad", published=published(1))
+        updated = update(router, root, [good, bad])
         router.wait_for_new_boot(updated, limit=600)
         assert "build-test-bad" in router.run(f"cat {STATE}/bad").split(), (
             "an update that failed its checks was not marked bad"

@@ -78,9 +78,10 @@ in the package build; the tests in `tests/hardware` run against a router.
   `test_the_image_trusts_the_release_key_under_its_usign_id`. It downloads
   and verifies the newest release from its release source:
   `test_the_router_downloads_and_verifies_the_newest_published_release`. It
-  takes the newest release old enough and never an older one than it runs:
-  `test_the_router_picks_the_newest_release_old_enough_and_newer_than_its_own`,
-  and its check names the release that falls due next and the day:
+  takes the newest release old enough and never an older one than it runs,
+  wherever the list puts it:
+  `test_the_router_picks_the_newest_release_old_enough_and_newer_than_its_own`
+  and `test_the_router_reads_every_page_of_the_release_list`, and its check names the release that falls due next and the day:
   `test_the_check_names_the_release_it_waits_for_and_when_it_is_due`.
   An update that loses what worked before is flashed back and never taken
   again: `test_the_check_watches_what_works_now`,
@@ -321,5 +322,8 @@ through the issue its report job opens.
   it runs before its first update, and refuses an update without one; an
   image that does not boot at all needs rescue mode. It takes the newest
   release a few days old rather than the latest, which a daily build keeps
-  younger than any delay. It ships off, every setting lives on the router,
+  younger than any delay. GitHub documents no order for its release list
+  and serves it 30 to a page by default (REST docs, 2026-11-25); on
+  2026-11-25 it listed four releases by tag name, the newest last. So the
+  router orders the releases by publish date and reads every page. It ships off, every setting lives on the router,
   and it leaves once `owut` serves this board.

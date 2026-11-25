@@ -72,24 +72,37 @@ load_release() {
   [ -n "$TAG" ] && [ -n "$IMAGE" ]
 }
 
+releases() {
+  page=1
+  while uclient-fetch -q -T 30 -O "$WORK/latest/$page.json" "$URL?per_page=100&page=$page"; do
+    i=0
+    while tag=$(jsonfilter -i "$WORK/latest/$page.json" -e "@[$i].tag_name"); do
+      echo "$(jsonfilter -i "$WORK/latest/$page.json" -e "@[$i].published_at") $page $i $tag"
+      i=$((i + 1))
+    done
+    [ "$i" -eq 100 ] || return 0
+    page=$((page + 1))
+  done
+  return 1
+}
+
 pick_release() {
-  list=$WORK/latest/releases.json
   rm -rf "$WORK/latest"
   mkdir -p "$WORK/latest"
-  uclient-fetch -q -T 30 -O "$list" "$URL" || {
+  releases >"$WORK/latest/listed" || {
     REASON="the release list cannot be fetched"
     return 1
   }
+  sort -r "$WORK/latest/listed" >"$WORK/latest/newest-first"
   REASON="no release newer than the running one is $MIN_AGE days old"
   waiting=
   waiting_due=
-  i=0
-  while tag=$(jsonfilter -i "$list" -e "@[$i].tag_name"); do
+  while read -r published page i tag; do
     if [ -n "$RUNNING" ] && [ "$tag" = "$(running_tag)" ]; then
       REASON="this router runs the newest release that is old enough"
       break
     fi
-    published=$(jsonfilter -i "$list" -e "@[$i].published_at")
+    list=$WORK/latest/$page.json
     if [ "$(jsonfilter -i "$list" -e "@[$i].prerelease")" != true ] && ! bad "$tag"; then
       if old_enough "$published"; then
         jsonfilter -i "$list" -e "@[$i]" >"$WORK/latest/release.json"
@@ -99,8 +112,7 @@ pick_release() {
         waiting="$tag turns $MIN_AGE days old on $(date -d "@$due" +%Y-%m-%d) and is due between $START and $END"
       fi
     fi
-    i=$((i + 1))
-  done
+  done <"$WORK/latest/newest-first"
   [ -z "$waiting" ] || REASON="$REASON; $waiting"
   return 1
 }
