@@ -51,8 +51,10 @@ Note the image's SHA256, as `SHA256SUMS` or `sha256sum` gives it. Then:
 
 1. Power the router off, hold Reset, power it on, and release Reset when the
    power LED blinks slowly.
+
 2. Connect a LAN port, not the WAN port, to the same network segment as your
    machine.
+
 3. Give your machine the address `192.168.1.10/24`:
 
    ```bash
